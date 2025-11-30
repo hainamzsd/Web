@@ -58,7 +58,7 @@ export default function UsersPage() {
 
   const roleLabels: Record<string, string> = {
     commune_officer: 'Cán bộ Xã',
-    commune_supervisor: 'Giám sát Xã',
+    commune_supervisor: 'Công an tỉnh/thành phố',
     central_admin: 'Quản trị Trung ương',
     system_admin: 'Quản trị Hệ thống',
   }
@@ -110,7 +110,7 @@ export default function UsersPage() {
             <div className="text-2xl font-bold">
               {users.filter(u => u.role === 'commune_supervisor').length}
             </div>
-            <p className="text-sm text-gray-600 mt-1">Giám sát Xã</p>
+            <p className="text-sm text-gray-600 mt-1">Công an tỉnh/thành phố</p>
           </CardContent>
         </Card>
         <Card>
@@ -194,8 +194,8 @@ export default function UsersPage() {
                     </td>
                     <td className="py-3 px-4">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${user.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
                         }`}>
                         {user.is_active ? 'Hoạt động' : 'Ngưng'}
                       </span>

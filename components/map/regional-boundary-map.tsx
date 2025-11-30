@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
-import { LatLngBounds } from 'leaflet'
-import L from 'leaflet'
+import type { Map as LeafletMap } from 'leaflet'
 import { MAP_CONFIG } from '@/lib/map/leaflet-config'
 import { getUserBoundary, getBoundaryMaskGeometry, BoundaryContext } from '@/lib/security/boundary-enforcement'
 import 'leaflet/dist/leaflet.css'
@@ -74,11 +73,24 @@ export function RegionalBoundaryMap({
   children
 }: RegionalBoundaryMapProps) {
   const allowedBounds = getUserBoundary(boundaryContext)
+  const [isClient, setIsClient] = useState(false)
 
   // Determine initial center
   const mapCenter = center || (allowedBounds ?
     [allowedBounds.getCenter().lat, allowedBounds.getCenter().lng] as [number, number] :
     MAP_CONFIG.DEFAULT_CENTER as [number, number])
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  if (!isClient) {
+    return (
+      <div className="h-full w-full bg-gray-100 animate-pulse rounded-lg flex items-center justify-center text-gray-400">
+        Đang tải bản đồ...
+      </div>
+    )
+  }
 
   return (
     <MapContainer

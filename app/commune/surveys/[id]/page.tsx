@@ -12,9 +12,17 @@ import { Button } from '@/components/ui/button'
 import { PhotoUpload } from '@/components/survey/photo-upload'
 import { ArrowLeft, Save, Send, Camera, MapPin, Search } from 'lucide-react'
 import Link from 'next/link'
-import { EnhancedSurveyMap } from '@/components/map/enhanced-survey-map'
+import nextDynamic from 'next/dynamic'
 import { Database } from '@/lib/types/database'
 import { toast } from 'sonner'
+
+const EnhancedSurveyMap = nextDynamic(
+  () => import('@/components/map/enhanced-survey-map').then(mod => mod.EnhancedSurveyMap),
+  {
+    ssr: false,
+    loading: () => <div className="h-[400px] w-full bg-gray-100 animate-pulse rounded-lg flex items-center justify-center text-gray-400">Đang tải bản đồ...</div>
+  }
+)
 
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
@@ -30,29 +38,78 @@ export default function SurveyDetailPage() {
   const supabase = createClient()
 
   useEffect(() => {
+    let mounted = true
+    const abortController = new AbortController()
+
     async function fetchSurvey() {
       if (!params?.id) {
+        console.log('No survey ID provided')
         setLoading(false)
         return
       }
+
+      console.log('Fetching survey with ID:', params.id)
+
+      // Set a timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        if (mounted && loading) {
+          console.error('Survey fetch timed out')
+          toast.error("Lỗi tải dữ liệu", {
+            description: "Thời gian chờ quá lâu, vui lòng thử lại sau.",
+          })
+          setLoading(false)
+          abortController.abort()
+        }
+      }, 10000) // 10 seconds timeout
 
       try {
         const { data, error } = await supabase
           .from('survey_locations')
           .select('*')
           .eq('id', params.id as string)
+          .abortSignal(abortController.signal)
           .single()
 
-        if (error) throw error
-        setSurvey(data)
-      } catch (error) {
-        console.error('Error fetching survey:', error)
+        clearTimeout(timeoutId)
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            console.log('Survey not found (PGRST116)')
+            // Not found is not a critical error, just no data
+          } else {
+            throw error
+          }
+        }
+
+        if (mounted) {
+          console.log('Survey fetched successfully:', data)
+          setSurvey(data)
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.log('Fetch aborted')
+        } else {
+          console.error('Error fetching survey:', error)
+          if (mounted) {
+            toast.error("Lỗi", {
+              description: "Không thể tải thông tin khảo sát.",
+            })
+          }
+        }
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
+        clearTimeout(timeoutId)
       }
     }
 
     fetchSurvey()
+
+    return () => {
+      mounted = false
+      abortController.abort()
+    }
   }, [params?.id])
 
   const handleParcelSearch = async () => {

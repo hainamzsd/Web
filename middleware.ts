@@ -31,9 +31,29 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Add timeout to getUser to prevent hanging
+  const getUserPromise = supabase.auth.getUser()
+  const timeoutPromise = new Promise<{ data: { user: null }; error: null }>((resolve) => {
+    setTimeout(() => {
+      // console.warn('Supabase getUser timed out in middleware')
+      resolve({ data: { user: null }, error: null })
+    }, 2000)
+  })
+
+  let user = null
+  try {
+    const {
+      data: { user: fetchedUser },
+    } = (await Promise.race([getUserPromise, timeoutPromise])) as {
+      data: { user: any }
+      error: any
+    }
+    user = fetchedUser
+  } catch (err) {
+    // console.error('Middleware auth error:', err)
+    // If auth fails (e.g. invalid refresh token), treat as logged out
+    user = null
+  }
 
   // Protected routes
   const isProtectedRoute =
@@ -57,11 +77,18 @@ export async function middleware(request: NextRequest) {
   // Redirect to dashboard if accessing login while authenticated
   if (request.nextUrl.pathname === '/login' && user) {
     // Fetch user role to redirect to appropriate dashboard
-    const { data: webUser } = await supabase
+    // Add timeout to prevent hanging if DB is slow
+    const fetchWebUserPromise = supabase
       .from('web_users')
       .select('role')
       .eq('profile_id', user.id)
       .single()
+
+    const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) => {
+      setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 5000)
+    })
+
+    const { data: webUser } = await Promise.race([fetchWebUserPromise, timeoutPromise]) as any
 
     if (webUser) {
       const roleRoutes: Record<string, string> = {

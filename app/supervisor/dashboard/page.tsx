@@ -45,10 +45,18 @@ export default function SupervisorDashboardPage() {
       if (!webUser) return
 
       try {
+        // Check if province_code is set
+        if (!webUser.province_code) {
+          console.error('[Supervisor Dashboard] province_code is not set for this user!')
+          setLoading(false)
+          return
+        }
+
+        // Supervisors are province-level users - filter by province_code
         const { data, error } = await supabase
           .from('survey_locations')
           .select('*')
-          .eq('ward_code', webUser.commune_code)
+          .eq('province_code', webUser.province_code)
           .order('created_at', { ascending: false })
 
         if (error) throw error

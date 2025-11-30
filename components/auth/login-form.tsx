@@ -21,13 +21,21 @@ export function LoginForm() {
     setLoading(true)
 
     try {
-      const { error } = await signIn(email, password)
+      const { webUser, error } = await signIn(email, password)
 
       if (error) {
         setError(error.message)
-      } else {
-        // Redirect based on role will be handled by middleware
-        router.push('/commune/dashboard')
+      } else if (webUser) {
+        // Redirect based on user role
+        const roleRoutes: Record<string, string> = {
+          commune_officer: '/commune/dashboard',
+          commune_supervisor: '/supervisor/dashboard',
+          central_admin: '/central/dashboard',
+          system_admin: '/central/dashboard',
+        }
+
+        const targetRoute = roleRoutes[webUser.role] || '/commune/dashboard'
+        router.push(targetRoute)
         router.refresh()
       }
     } catch {

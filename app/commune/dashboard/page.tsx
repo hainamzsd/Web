@@ -7,8 +7,10 @@ import { useAuth } from '@/lib/auth/auth-context'
 import { createClient } from '@/lib/supabase/client'
 import { StatsCard } from '@/components/ui/stats-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, Activity, MapPin } from 'lucide-react'
+import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, Activity, MapPin, Zap } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { QualityScore, calculateQualityScore } from '@/components/ui/quality-score'
+import { OfficerLeaderboard } from '@/components/leaderboard/officer-leaderboard'
 import Link from 'next/link'
 import { Database } from '@/lib/types/database'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
@@ -309,7 +311,12 @@ export default function CommuneDashboardPage() {
                           })}
                         </p>
                       </div>
-                      <StatusBadge status={survey.status} />
+                      <div className="flex items-center gap-3">
+                        <div className="hidden sm:block">
+                          <QualityScore score={calculateQualityScore(survey).total} size="sm" />
+                        </div>
+                        <StatusBadge status={survey.status} />
+                      </div>
                     </div>
                   </Link>
                 ))}
@@ -342,6 +349,41 @@ export default function CommuneDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Officer Leaderboard */}
+      <OfficerLeaderboard scope="commune" communeCode={webUser?.commune_code || undefined} limit={5} />
+
+      {/* AI Quality Notice */}
+      <Card className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-white/20 rounded-xl">
+              <Zap className="h-8 w-8" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">AI Quality Scoring</h3>
+              <p className="text-indigo-100 mt-1">
+                Mỗi khảo sát được AI đánh giá tự động dựa trên chất lượng ảnh, độ chính xác GPS,
+                và mức độ đầy đủ thông tin. Điểm số cao giúp khảo sát được duyệt nhanh hơn!
+              </p>
+              <div className="flex gap-4 mt-4">
+                <div className="bg-white/20 rounded-lg px-3 py-2">
+                  <span className="text-green-300 font-bold">90+</span>
+                  <span className="text-indigo-100 text-sm ml-2">Fast Track</span>
+                </div>
+                <div className="bg-white/20 rounded-lg px-3 py-2">
+                  <span className="text-blue-300 font-bold">70-89</span>
+                  <span className="text-indigo-100 text-sm ml-2">Normal</span>
+                </div>
+                <div className="bg-white/20 rounded-lg px-3 py-2">
+                  <span className="text-yellow-300 font-bold">&lt;70</span>
+                  <span className="text-indigo-100 text-sm ml-2">Cần xem xét</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

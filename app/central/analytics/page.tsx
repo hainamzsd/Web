@@ -7,6 +7,9 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart3, TrendingUp, PieChart as PieChartIcon, Activity, MapPin, Users, Clock, CheckCircle } from 'lucide-react'
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
+import { Database } from '@/lib/types/database'
+
+type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
 interface AnalyticsData {
   totalSurveys: number
@@ -53,41 +56,43 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function fetchAnalytics() {
       try {
-        const { data: surveys, error } = await supabase
+        const { data, error } = await supabase
           .from('survey_locations')
           .select('*')
           .order('created_at', { ascending: false })
 
         if (error) throw error
 
+        const surveys: SurveyLocation[] = data || []
+
         const now = new Date()
         const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
         const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
 
         // Calculate metrics
-        const total = surveys?.length || 0
-        const completed = surveys?.filter(s => s.status === 'published').length || 0
-        const approved = surveys?.filter(s =>
+        const total = surveys.length
+        const completed = surveys.filter(s => s.status === 'published').length
+        const approved = surveys.filter(s =>
           s.status === 'approved_central' || s.status === 'published'
-        ).length || 0
+        ).length
 
-        const thisMonthCount = surveys?.filter(s =>
+        const thisMonthCount = surveys.filter(s =>
           new Date(s.created_at) >= thisMonth
-        ).length || 0
+        ).length
 
-        const lastMonthCount = surveys?.filter(s => {
+        const lastMonthCount = surveys.filter(s => {
           const date = new Date(s.created_at)
           return date >= lastMonth && date < thisMonth
-        }).length || 0
+        }).length
 
         const growth = lastMonthCount > 0
           ? ((thisMonthCount - lastMonthCount) / lastMonthCount * 100)
           : thisMonthCount > 0 ? 100 : 0
 
         // Calculate average processing time (in hours)
-        const processedSurveys = surveys?.filter(s =>
+        const processedSurveys = surveys.filter(s =>
           s.status === 'published' && s.updated_at && s.created_at
-        ) || []
+        )
 
         const avgTime = processedSurveys.length > 0
           ? processedSurveys.reduce((sum, s) => {
@@ -102,10 +107,10 @@ export default function AnalyticsPage() {
           const monthStart = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
           const monthEnd = new Date(now.getFullYear(), now.getMonth() - (5 - i) + 1, 1)
 
-          const monthSurveys = surveys?.filter(s => {
+          const monthSurveys = surveys.filter(s => {
             const date = new Date(s.created_at)
             return date >= monthStart && date < monthEnd
-          }) || []
+          })
 
           return {
             month: monthStart.toLocaleDateString('vi-VN', { month: 'short', year: '2-digit' }),
@@ -118,7 +123,7 @@ export default function AnalyticsPage() {
 
         // Province statistics (top 10)
         const provinceMap = new Map<string, { total: number; approved: number }>()
-        surveys?.forEach(survey => {
+        surveys.forEach(survey => {
           const provinceCode = survey.province_code?.substring(0, 2) || 'Unknown'
           const existing = provinceMap.get(provinceCode) || { total: 0, approved: 0 }
           existing.total++
@@ -139,7 +144,7 @@ export default function AnalyticsPage() {
 
         // Object types distribution
         const objectTypeMap = new Map<string, number>()
-        surveys?.forEach(s => {
+        surveys.forEach(s => {
           const type = s.object_type || 'Chưa phân loại'
           objectTypeMap.set(type, (objectTypeMap.get(type) || 0) + 1)
         })
@@ -151,7 +156,7 @@ export default function AnalyticsPage() {
 
         // Status distribution
         const statusMap = new Map<string, number>()
-        surveys?.forEach(s => {
+        surveys.forEach(s => {
           statusMap.set(s.status, (statusMap.get(s.status) || 0) + 1)
         })
 
@@ -160,7 +165,7 @@ export default function AnalyticsPage() {
 
         // Land use types
         const landUseMap = new Map<string, number>()
-        surveys?.forEach(s => {
+        surveys.forEach(s => {
           const type = s.land_use_type || 'Chưa xác định'
           landUseMap.set(type, (landUseMap.get(type) || 0) + 1)
         })
@@ -171,11 +176,12 @@ export default function AnalyticsPage() {
           .slice(0, 6)
 
         // Performance metrics
+        const rejectedCount = surveys.filter(s => s.status === 'rejected').length
         const performanceMetrics = [
           { metric: 'Hiệu quả', score: Math.round((completed / total) * 100) || 0 },
           { metric: 'Chất lượng', score: Math.round((approved / total) * 100) || 0 },
           { metric: 'Tốc độ', score: Math.round(100 - Math.min(avgTime / 2, 100)) || 0 },
-          { metric: 'Độ chính xác', score: Math.round((1 - ((surveys?.filter(s => s.status === 'rejected').length || 0) / total)) * 100) || 0 },
+          { metric: 'Độ chính xác', score: total > 0 ? Math.round((1 - (rejectedCount / total)) * 100) : 0 },
           { metric: 'Phản hồi', score: Math.round((thisMonthCount / (lastMonthCount || 1)) * 50) || 0 },
         ]
 

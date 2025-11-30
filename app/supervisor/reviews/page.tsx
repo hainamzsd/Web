@@ -25,11 +25,13 @@ export default function ReviewsPage() {
       if (!webUser) return
 
       try {
+        // Supervisors are province-level users - filter by province_code
+        // Show both 'pending' (new from mobile) and 'reviewed' (reviewed by commune officer)
         const { data, error } = await supabase
           .from('survey_locations')
           .select('*')
-          .eq('ward_code', webUser.commune_code)
-          .eq('status', 'reviewed')
+          .eq('province_code', webUser.province_code)
+          .in('status', ['pending', 'reviewed'])
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -60,13 +62,13 @@ export default function ReviewsPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Xem xét khảo sát</h1>
         <p className="text-gray-500 mt-1">
-          Danh sách khảo sát chờ phê duyệt
+          Danh sách khảo sát mới và chờ phê duyệt trong tỉnh
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Khảo sát chờ xem xét ({surveys.length})</CardTitle>
+          <CardTitle>Khảo sát cần xử lý ({surveys.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {surveys.length === 0 ? (

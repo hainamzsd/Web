@@ -30,7 +30,7 @@ interface ProvinceStat {
 }
 
 export default function NationalMapPage() {
-  const { webUser } = useAuth()
+  const { webUser, loading: authLoading } = useAuth()
   const [surveys, setSurveys] = useState<SurveyLocation[]>([])
   const [provinceStats, setProvinceStats] = useState<ProvinceStat[]>([])
   const [selectedProvince, setSelectedProvince] = useState<string>('')
@@ -41,7 +41,13 @@ export default function NationalMapPage() {
 
   useEffect(() => {
     async function fetchData() {
-      if (!webUser) return
+      // Wait for auth to finish loading
+      if (authLoading) return
+
+      if (!webUser) {
+        setLoading(false)
+        return
+      }
 
       try {
         // Fetch all surveys
@@ -77,7 +83,8 @@ export default function NationalMapPage() {
     }
 
     fetchData()
-  }, [webUser, supabase, selectedProvince, selectedDistrict, selectedCommune])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webUser, authLoading, selectedProvince, selectedDistrict, selectedCommune])
 
   const calculateProvinceStats = (surveys: SurveyLocation[]): ProvinceStat[] => {
     const statsByProvince: Record<string, ProvinceStat> = {}
@@ -213,17 +220,17 @@ export default function NationalMapPage() {
             <CardContent>
               <div className="h-[600px] rounded-lg overflow-hidden">
                 <VietnamAdminMap
-                  selectedProvince={selectedProvince}
-                  selectedDistrict={selectedDistrict}
-                  selectedCommune={selectedCommune}
-                  onProvinceSelect={setSelectedProvince}
                   showSurveys={true}
                   surveys={surveys.map(s => ({
                     id: s.id,
                     latitude: s.latitude,
                     longitude: s.longitude,
                     location_name: s.location_name || 'Unknown',
-                    status: s.status
+                    status: s.status,
+                    polygon_geometry: s.polygon_geometry,
+                    address: s.address || undefined,
+                    owner_name: s.owner_name || undefined,
+                    land_area_m2: s.land_area_m2
                   }))}
                 />
               </div>

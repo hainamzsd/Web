@@ -1,26 +1,17 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useId } from 'react'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
-import { LatLngExpression } from 'leaflet'
+import type { LatLngExpression, Map as LeafletMap } from 'leaflet'
 import { MAP_CONFIG } from '@/lib/map/leaflet-config'
 import 'leaflet/dist/leaflet.css'
-
-// Fix for default marker icon
-import L from 'leaflet'
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-  iconUrl: '/leaflet/marker-icon.png',
-  shadowUrl: '/leaflet/marker-shadow.png',
-})
 
 interface BaseMapProps {
   center?: LatLngExpression
   zoom?: number
   children?: React.ReactNode
   className?: string
-  onMapReady?: (map: L.Map) => void
+  onMapReady?: (map: LeafletMap) => void
 }
 
 // Component to capture map instance and handle cleanup
@@ -28,12 +19,24 @@ function MapController({
   onMapReady,
   mapInstanceRef
 }: {
-  onMapReady?: (map: L.Map) => void
-  mapInstanceRef: React.MutableRefObject<L.Map | null>
+  onMapReady?: (map: LeafletMap) => void
+  mapInstanceRef: React.MutableRefObject<LeafletMap | null>
 }) {
   const map = useMap()
 
   useEffect(() => {
+    // Fix marker icons - do this inside useEffect
+    const fixMarkerIcons = async () => {
+      const L = await import('leaflet')
+      delete (L.default.Icon.Default.prototype as any)._getIconUrl
+      L.default.Icon.Default.mergeOptions({
+        iconRetinaUrl: '/leaflet/marker-icon-2x.png',
+        iconUrl: '/leaflet/marker-icon.png',
+        shadowUrl: '/leaflet/marker-shadow.png',
+      })
+    }
+    fixMarkerIcons()
+
     // Store map instance in ref for cleanup
     mapInstanceRef.current = map
 
@@ -64,21 +67,30 @@ export function BaseMap({
   className = "h-full w-full",
   onMapReady
 }: BaseMapProps) {
+  const mapId = useId()
   const [isMounted, setIsMounted] = useState(false)
-  const mapInstanceRef = useRef<L.Map | null>(null)
+  const [mapReady, setMapReady] = useState(false)
+  const mapInstanceRef = useRef<LeafletMap | null>(null)
 
   useEffect(() => {
     setIsMounted(true)
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => setMapReady(true), 50)
+    return () => {
+      clearTimeout(timer)
+      setMapReady(false)
+    }
   }, [])
 
   // Don't render until client-side to avoid SSR issues
-  if (!isMounted) {
+  if (!isMounted || !mapReady) {
     return <div className={className} style={{ background: '#f0f0f0' }} />
   }
 
   return (
     <div className={className}>
       <MapContainer
+        key={`base-map-${mapId}`}
         center={center}
         zoom={zoom}
         minZoom={MAP_CONFIG.MIN_ZOOM}

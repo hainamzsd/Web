@@ -1,10 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from 'react-leaflet'
-import L from 'leaflet'
+import { useEffect, useState, useId } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polygon } from 'react-leaflet'
+import type { DivIcon, LatLngExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { VIETNAM_BOUNDS } from '@/lib/map/vietnam-administrative-data'
+import { Json } from '@/lib/types/database'
+
+interface SurveyData {
+  id: string
+  latitude: number
+  longitude: number
+  location_name: string
+  status: string
+  polygon_geometry?: Json | null
+  address?: string
+  owner_name?: string
+  land_area_m2?: number | null
+}
 
 interface VietnamAdminMapProps {
   selectedProvince?: string
@@ -14,13 +27,8 @@ interface VietnamAdminMapProps {
   onDistrictSelect?: (code: string) => void
   onCommuneSelect?: (code: string) => void
   showSurveys?: boolean
-  surveys?: Array<{
-    id: string
-    latitude: number
-    longitude: number
-    location_name: string
-    status: string
-  }>
+  surveys?: SurveyData[]
+  onSurveySelect?: (survey: SurveyData | null) => void
 }
 
 // Map bounds controller
@@ -35,159 +43,117 @@ function MapBoundsController({ bounds }: { bounds: [[number, number], [number, n
 }
 
 export function VietnamAdminMap({
-  selectedProvince,
-  selectedDistrict,
-  onProvinceSelect,
   showSurveys = true,
-  surveys = []
+  surveys = [],
+  onSurveySelect
 }: VietnamAdminMapProps) {
-  const [provinces, setProvinces] = useState<GeoJSON.FeatureCollection | null>(null)
-  const [districts] = useState<GeoJSON.FeatureCollection | null>(null)
-  const [communes] = useState<GeoJSON.FeatureCollection | null>(null)
+  const mapId = useId()
   const [mapBounds] = useState<[[number, number], [number, number]]>(VIETNAM_BOUNDS)
+  const [isClient, setIsClient] = useState(false)
+  const [mapReady, setMapReady] = useState(false)
+  const [markerIcons, setMarkerIcons] = useState<Record<string, DivIcon>>({})
+  const [selectedSurvey, setSelectedSurvey] = useState<SurveyData | null>(null)
 
-  // Load GeoJSON boundaries (in production, these would come from a server)
   useEffect(() => {
-    // For now, we'll use simplified boundaries
-    // In production, load from: /api/boundaries/provinces.geojson
+    setIsClient(true)
 
-    // Simplified Vietnam provinces GeoJSON structure
-    const simplifiedProvinces: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection' as const,
-      features: [
-        {
-          type: 'Feature',
-          properties: {
-            code: '01',
-            name: 'Hà Nội',
-            region: 'north'
-          },
-          geometry: {
-            type: 'Polygon',
-            coordinates: [[
-              [105.3, 20.5],
-              [106.0, 20.5],
-              [106.0, 21.4],
-              [105.3, 21.4],
-              [105.3, 20.5]
-            ]]
-          }
-        },
-        {
-          type: 'Feature',
-          properties: {
-            code: '79',
-            name: 'TP. Hồ Chí Minh',
-            region: 'south'
-          },
-          geometry: {
-            type: 'Polygon',
-            coordinates: [[
-              [106.3, 10.3],
-              [107.0, 10.3],
-              [107.0, 11.2],
-              [106.3, 11.2],
-              [106.3, 10.3]
-            ]]
-          }
-        },
-        {
-          type: 'Feature',
-          properties: {
-            code: '48',
-            name: 'Đà Nẵng',
-            region: 'central'
-          },
-          geometry: {
-            type: 'Polygon',
-            coordinates: [[
-              [107.9, 15.9],
-              [108.3, 15.9],
-              [108.3, 16.2],
-              [107.9, 16.2],
-              [107.9, 15.9]
-            ]]
-          }
-        }
-      ]
+    // Small delay to ensure DOM is ready before mounting map
+    const timer = setTimeout(() => {
+      setMapReady(true)
+    }, 100)
+
+    // Initialize marker icons on client side
+    const initIcons = async () => {
+      const L = await import('leaflet')
+      const colors: Record<string, string> = {
+        pending: '#FCD34D',
+        reviewed: '#60A5FA',
+        approved_commune: '#34D399',
+        approved_central: '#10B981',
+        rejected: '#EF4444',
+        published: '#8B5CF6'
+      }
+
+      const icons: Record<string, DivIcon> = {}
+      Object.entries(colors).forEach(([status, color]) => {
+        icons[status] = L.default.divIcon({
+          className: 'custom-marker',
+          html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        })
+      })
+      icons['default'] = L.default.divIcon({
+        className: 'custom-marker',
+        html: `<div style="background-color: #6B7280; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      })
+      setMarkerIcons(icons)
     }
+    initIcons()
 
-    setProvinces(simplifiedProvinces)
+    return () => {
+      clearTimeout(timer)
+      setMapReady(false)
+    }
   }, [])
 
-  // Province style
-  const provinceStyle = (feature?: GeoJSON.Feature) => {
-    const isSelected = feature?.properties?.code === selectedProvince
-    return {
-      fillColor: isSelected ? '#3b82f6' : getRegionColor(feature?.properties?.region || 'north'),
-      weight: isSelected ? 3 : 1,
-      opacity: 1,
-      color: isSelected ? '#1e40af' : '#666',
-      fillOpacity: isSelected ? 0.5 : 0.2
-    }
-  }
-
-  const getRegionColor = (region: string) => {
-    switch (region) {
-      case 'north': return '#10b981'
-      case 'central': return '#f59e0b'
-      case 'south': return '#ef4444'
-      default: return '#6b7280'
-    }
-  }
-
-  // Handle province click
-  const onEachProvince = (feature: GeoJSON.Feature, layer: L.Layer) => {
-    layer.on({
-      click: () => {
-        if (onProvinceSelect && feature.properties?.code) {
-          onProvinceSelect(feature.properties.code)
-        }
-      },
-      mouseover: (e: L.LeafletMouseEvent) => {
-        const eventLayer = e.target as L.Path
-        eventLayer.setStyle({
-          weight: 3,
-          fillOpacity: 0.4
-        })
-      },
-      mouseout: (e: L.LeafletMouseEvent) => {
-        const eventLayer = e.target as L.Path
-        eventLayer.setStyle(provinceStyle(feature))
-      }
-    })
-
-    layer.bindPopup(`
-      <div class="p-2">
-        <h3 class="font-bold">${feature.properties?.name || 'Unknown'}</h3>
-        <p class="text-sm text-gray-600">Mã: ${feature.properties?.code || 'N/A'}</p>
-        <p class="text-sm text-gray-600">Vùng: ${feature.properties?.region || 'N/A'}</p>
-      </div>
-    `)
-  }
-
-  // Survey marker style
   const getMarkerIcon = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: '#FCD34D',
-      reviewed: '#60A5FA',
-      approved_commune: '#34D399',
-      approved_central: '#10B981',
-      rejected: '#EF4444',
-      published: '#8B5CF6'
+    return markerIcons[status] || markerIcons['default']
+  }
+
+  // Convert polygon_geometry to LatLngExpression array for react-leaflet
+  const getPolygonPositions = (geometry: Json | null | undefined): LatLngExpression[] => {
+    if (!geometry) return []
+
+    try {
+      // Handle GeoJSON format
+      if (typeof geometry === 'object' && geometry !== null) {
+        const geo = geometry as { type?: string; coordinates?: number[][][] }
+        if (geo.type === 'Polygon' && geo.coordinates && geo.coordinates[0]) {
+          // GeoJSON is [lng, lat] but Leaflet expects [lat, lng]
+          return geo.coordinates[0].map(coord => [coord[1], coord[0]] as LatLngExpression)
+        }
+      }
+
+      // Handle array of [lat, lng] points
+      if (Array.isArray(geometry)) {
+        return geometry.map(point => {
+          if (Array.isArray(point) && point.length >= 2) {
+            return [point[0], point[1]] as LatLngExpression
+          }
+          if (typeof point === 'object' && point !== null) {
+            const p = point as { lat?: number; lng?: number; latitude?: number; longitude?: number }
+            return [p.lat || p.latitude || 0, p.lng || p.longitude || 0] as LatLngExpression
+          }
+          return [0, 0] as LatLngExpression
+        })
+      }
+    } catch (e) {
+      console.error('Error parsing polygon geometry:', e)
     }
 
-    return L.divIcon({
-      className: 'custom-marker',
-      html: `<div style="background-color: ${colors[status] || '#6B7280'}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12]
-    })
+    return []
+  }
+
+  const handleSurveyClick = (survey: SurveyData) => {
+    setSelectedSurvey(survey)
+    if (onSurveySelect) {
+      onSurveySelect(survey)
+    }
+  }
+
+  if (!isClient || !mapReady) {
+    return <div className="w-full h-full bg-gray-100 animate-pulse flex items-center justify-center">
+      <p className="text-gray-500">Đang tải bản đồ...</p>
+    </div>
   }
 
   return (
     <div className="relative w-full h-full">
       <MapContainer
+        key={`vietnam-admin-map-${mapId}`}
         bounds={mapBounds}
         zoom={6}
         scrollWheelZoom={true}
@@ -200,102 +166,92 @@ export function VietnamAdminMap({
 
         <MapBoundsController bounds={mapBounds} />
 
-        {/* Province boundaries */}
-        {provinces && (
-          <GeoJSON
-            data={provinces}
-            style={provinceStyle}
-            onEachFeature={onEachProvince}
-          />
-        )}
-
-        {/* District boundaries */}
-        {districts && selectedProvince && (
-          <GeoJSON
-            data={districts}
-            style={() => ({
-              fillColor: '#60a5fa',
-              weight: 2,
-              opacity: 1,
-              color: '#2563eb',
-              fillOpacity: 0.3
-            })}
-          />
-        )}
-
-        {/* Commune boundaries */}
-        {communes && selectedDistrict && (
-          <GeoJSON
-            data={communes}
-            style={() => ({
-              fillColor: '#34d399',
-              weight: 1,
-              opacity: 1,
-              color: '#059669',
-              fillOpacity: 0.2
-            })}
-          />
-        )}
-
         {/* Survey markers */}
-        {showSurveys && surveys.map((survey) => (
+        {showSurveys && Object.keys(markerIcons).length > 0 && surveys.map((survey) => (
           <Marker
             key={survey.id}
             position={[survey.latitude, survey.longitude]}
             icon={getMarkerIcon(survey.status)}
+            eventHandlers={{
+              click: () => handleSurveyClick(survey)
+            }}
           >
             <Popup>
-              <div className="p-2">
-                <h3 className="font-bold text-sm">{survey.location_name}</h3>
-                <p className="text-xs text-gray-600">Status: {survey.status}</p>
+              <div className="p-2 min-w-[200px]">
+                <h3 className="font-bold text-sm text-gray-900">{survey.location_name || 'Chưa đặt tên'}</h3>
+                {survey.address && (
+                  <p className="text-xs text-gray-600 mt-1">{survey.address}</p>
+                )}
+                {survey.owner_name && (
+                  <p className="text-xs text-gray-600">Chủ sở hữu: {survey.owner_name}</p>
+                )}
+                {survey.land_area_m2 && (
+                  <p className="text-xs text-gray-600">Diện tích: {survey.land_area_m2.toLocaleString('vi-VN')} m²</p>
+                )}
+                <div className="flex items-center gap-1 mt-2">
+                  <span className={`inline-block w-2 h-2 rounded-full ${
+                    survey.status === 'pending' ? 'bg-yellow-400' :
+                    survey.status === 'reviewed' ? 'bg-blue-400' :
+                    survey.status === 'approved_commune' ? 'bg-emerald-400' :
+                    survey.status === 'approved_central' ? 'bg-green-500' :
+                    survey.status === 'rejected' ? 'bg-red-500' :
+                    'bg-gray-400'
+                  }`}></span>
+                  <span className="text-xs text-gray-500">
+                    {survey.status === 'pending' ? 'Chờ xử lý' :
+                     survey.status === 'reviewed' ? 'Đã xem xét' :
+                     survey.status === 'approved_commune' ? 'Xã đã duyệt' :
+                     survey.status === 'approved_central' ? 'TW đã duyệt' :
+                     survey.status === 'rejected' ? 'Đã từ chối' :
+                     survey.status}
+                  </span>
+                </div>
+                {survey.polygon_geometry && (
+                  <p className="text-xs text-blue-600 mt-1">📐 Có dữ liệu ranh giới</p>
+                )}
               </div>
             </Popup>
           </Marker>
         ))}
+
+        {/* Display polygon for selected survey */}
+        {selectedSurvey && selectedSurvey.polygon_geometry && (
+          <Polygon
+            positions={getPolygonPositions(selectedSurvey.polygon_geometry)}
+            pathOptions={{
+              color: '#3b82f6',
+              weight: 3,
+              fillColor: '#3b82f6',
+              fillOpacity: 0.2
+            }}
+          />
+        )}
       </MapContainer>
 
       {/* Map Legend */}
-      <div className="absolute bottom-4 right-4 bg-white p-3 rounded-lg shadow-lg z-[1000]">
-        <h4 className="font-bold text-sm mb-2">Vùng miền</h4>
-        <div className="space-y-1 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10b981' }}></div>
-            <span>Miền Bắc</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#f59e0b' }}></div>
-            <span>Miền Trung</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ef4444' }}></div>
-            <span>Miền Nam</span>
+      {showSurveys && (
+        <div className="absolute bottom-4 right-4 bg-white p-3 rounded-lg shadow-lg z-[1000]">
+          <h4 className="font-bold text-sm mb-2">Trạng thái khảo sát</h4>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FCD34D' }}></div>
+              <span>Chờ xử lý</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#60A5FA' }}></div>
+              <span>Đã xem xét</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#34D399' }}></div>
+              <span>Xã đã duyệt</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }}></div>
+              <span>TW đã duyệt</span>
+            </div>
           </div>
         </div>
-
-        {showSurveys && (
-          <>
-            <h4 className="font-bold text-sm mt-3 mb-2">Trạng thái khảo sát</h4>
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FCD34D' }}></div>
-                <span>Chờ xử lý</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#60A5FA' }}></div>
-                <span>Đã xem xét</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#34D399' }}></div>
-                <span>Xã đã duyệt</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#10B981' }}></div>
-                <span>TW đã duyệt</span>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      )}
     </div>
   )
 }

@@ -22,10 +22,11 @@ export default function HistoryPage() {
       if (!webUser) return
 
       try {
+        // Supervisors are province-level users - filter by province_code
         const { data, error } = await supabase
           .from('survey_locations')
           .select('*')
-          .eq('ward_code', webUser.commune_code)
+          .eq('province_code', webUser.province_code)
           .in('status', ['approved_commune', 'rejected', 'approved_central', 'published'])
           .order('updated_at', { ascending: false })
           .limit(100)

@@ -14,7 +14,7 @@ export function Header() {
 
   const roleLabels: Record<string, string> = {
     commune_officer: 'Cán bộ Xã',
-    commune_supervisor: 'Giám sát Xã',
+    commune_supervisor: 'Công an tỉnh/thành phố',
     central_admin: 'Quản trị Trung ương',
     system_admin: 'Quản trị Hệ thống',
   }
