@@ -47,19 +47,16 @@ export default async function SurveysPage() {
     redirect('/login')
   }
 
-  // Fetch surveys for this commune - use ward_id if available, otherwise ward_code
-  let surveysQuery = supabase
-    .from('survey_locations')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (webUser.ward_id) {
-    surveysQuery = surveysQuery.eq('ward_id', webUser.ward_id)
-  } else if (webUser.commune_code) {
-    surveysQuery = surveysQuery.eq('ward_code', webUser.commune_code)
+  // Fetch surveys for this commune - filter by ward_id
+  if (!webUser.ward_id) {
+    return <SurveysClient initialSurveys={[]} entryPointCounts={{}} />
   }
 
-  const { data: surveys } = await surveysQuery
+  const { data: surveys } = await supabase
+    .from('survey_locations')
+    .select('*')
+    .eq('ward_id', webUser.ward_id)
+    .order('created_at', { ascending: false })
 
   // Fetch entry point counts
   const surveyIds = (surveys || []).map(s => s.id)

@@ -11,32 +11,40 @@ import { Map, Layers, TrendingUp } from 'lucide-react'
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
 export default function CommuneMapPage() {
-  const { webUser } = useAuth()
+  const { webUser, loading: authLoading } = useAuth()
   const [surveys, setSurveys] = useState<SurveyLocation[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
     async function fetchSurveys() {
-      if (!webUser) return
+      // Wait for auth to finish loading
+      if (authLoading) return
+
+      if (!webUser || !webUser.ward_id) {
+        setDataLoading(false)
+        return
+      }
 
       try {
         const { data, error } = await supabase
           .from('survey_locations')
           .select('*')
-          .eq('ward_code', webUser.commune_code)
+          .eq('ward_id', webUser.ward_id)
 
         if (error) throw error
         setSurveys(data || [])
       } catch (error) {
         console.error('Error fetching surveys:', error)
       } finally {
-        setLoading(false)
+        setDataLoading(false)
       }
     }
 
     fetchSurveys()
-  }, [webUser])
+  }, [webUser, authLoading])
+
+  const loading = authLoading || dataLoading
 
   if (loading) {
     return (

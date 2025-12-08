@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/lib/auth/auth-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, CheckCircle, Clock, XCircle, TrendingUp, TrendingDown, Zap } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -15,45 +16,34 @@ type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 const COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444']
 
 export default function CommuneDashboardPage() {
+  const { webUser, loading: authLoading } = useAuth()
   const [stats, setStats] = useState({ pending: 0, reviewed: 0, approved: 0, rejected: 0, total: 0, thisWeek: 0, lastWeek: 0 })
   const [recentSurveys, setRecentSurveys] = useState<SurveyLocation[]>([])
   const [weeklyData, setWeeklyData] = useState<{ name: string; surveys: number }[]>([])
   const [statusData, setStatusData] = useState<{ name: string; surveys: number }[]>([])
-  const [communeCode, setCommuneCode] = useState<string | null>(null)
+  const [dataLoading, setDataLoading] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
     async function fetchData() {
-      // Get user first
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      // Wait for auth to finish loading
+      if (authLoading) return
 
-      const { data: webUser } = await supabase
-        .from('web_users')
-        .select('ward_id, commune_code')
-        .eq('profile_id', user.id)
-        .single()
-
-      if (!webUser) return
-      setCommuneCode(webUser.commune_code)
-
-      // Build query - filter by ward_id if available, otherwise by commune_code
-      let query = supabase
-        .from('survey_locations')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (webUser.ward_id) {
-        query = query.eq('ward_id', webUser.ward_id)
-      } else if (webUser.commune_code) {
-        query = query.eq('ward_code', webUser.commune_code)
-      } else {
-        return // No filter available
+      if (!webUser || !webUser.ward_id) {
+        setDataLoading(false)
+        return
       }
 
-      const { data } = await query
+      const { data } = await supabase
+        .from('survey_locations')
+        .select('*')
+        .eq('ward_id', webUser.ward_id)
+        .order('created_at', { ascending: false })
 
-      if (!data) return
+      if (!data) {
+        setDataLoading(false)
+        return
+      }
 
       const now = new Date()
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -88,10 +78,24 @@ export default function CommuneDashboardPage() {
         }
       })
       setWeeklyData(last7Days)
+      setDataLoading(false)
     }
 
     fetchData()
-  }, [])
+  }, [authLoading, webUser])
+
+  const loading = authLoading || dataLoading
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    )
+  }
 
   const weeklyGrowth = stats.lastWeek > 0
     ? ((stats.thisWeek - stats.lastWeek) / stats.lastWeek * 100).toFixed(1)
@@ -233,7 +237,7 @@ export default function CommuneDashboardPage() {
             <CardTitle>Xếp hạng cán bộ</CardTitle>
           </CardHeader>
           <CardContent>
-            <OfficerLeaderboard scope="commune" communeCode={communeCode || undefined} limit={5} />
+            <OfficerLeaderboard scope="commune" wardId={webUser?.ward_id || undefined} limit={5} />
           </CardContent>
         </Card>
       </div>

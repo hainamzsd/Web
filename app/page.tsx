@@ -6,15 +6,15 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center p-8 md:p-24 bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="max-w-4xl w-full text-center">
         {/* Government Header */}
-        {/* <div className="mb-8">
-          <p className="text-sm text-slate-500 tracking-wide mb-1">
-            CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
-          </p>
-          <p className="text-xs text-slate-400 mb-6">
-            Độc lập - Tự do - Hạnh phúc
-          </p>
-          <div className="w-16 h-0.5 bg-red-600 mx-auto mb-8"></div>
-        </div> */}
+          {/* <div className="mb-8">
+            <p className="text-sm text-slate-500 tracking-wide mb-1">
+              CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+            </p>
+            <p className="text-xs text-slate-400 mb-6">
+              Độc lập - Tự do - Hạnh phúc
+            </p>
+            <div className="w-16 h-0.5 bg-red-600 mx-auto mb-8"></div>
+          </div> */}
 
         {/* Main Title */}
         <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4 tracking-tight">

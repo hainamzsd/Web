@@ -28,20 +28,32 @@ export default async function ProcessRecordsPage() {
     redirect('/login')
   }
 
-  // Fetch initial surveys (default to pending)
+  // Check if ward_id is configured
+  if (!webUser.ward_id) {
+    return (
+      <ProcessClient
+        initialSurveys={[]}
+        initialStats={{ pending: 0, reviewed: 0, approved: 0, rejected: 0 }}
+      />
+    )
+  }
+
+  // Fetch initial surveys (default to pending) - FILTERED BY WARD
   const { data: surveys } = await supabase
     .from('survey_locations')
     .select('*')
+    .eq('ward_id', webUser.ward_id)
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
 
-  // Fetch stats
+  // Fetch stats - FILTERED BY WARD
   const statuses = ['pending', 'reviewed', 'approved_commune', 'rejected']
   const counts = await Promise.all(
     statuses.map(async (status) => {
       const { count } = await supabase
         .from('survey_locations')
         .select('*', { count: 'exact', head: true })
+        .eq('ward_id', webUser.ward_id)
         .eq('status', status)
       return count || 0
     })

@@ -11,6 +11,7 @@ interface AuthContextType {
   user: User | null
   webUser: WebUser | null
   session: Session | null
+  loading: boolean
   signIn: (email: string, password: string) => Promise<{ webUser: WebUser | null; error: Error | null }>
   signOut: () => Promise<void>
 }
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [webUser, setWebUser] = useState<WebUser | null>(null)
   const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const fetchWebUser = useCallback(async (userId: string): Promise<WebUser | null> => {
     const { data } = await supabase
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const wu = await fetchWebUser(s.user.id)
         setWebUser(wu)
       }
+      setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -91,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, webUser, session, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, webUser, session, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )

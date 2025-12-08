@@ -18,8 +18,8 @@ interface OfficerStats {
 
 interface LeaderboardProps {
   scope?: 'commune' | 'district' | 'national'
-  communeCode?: string
-  districtCode?: string
+  wardId?: number
+  provinceId?: number
   limit?: number
 }
 
@@ -31,7 +31,7 @@ const BADGE_ICONS: Record<string, { icon: string; label: string; color: string }
   'quality_king': { icon: '👑', label: 'Quality King', color: 'bg-amber-100 text-amber-800' },
 }
 
-export function OfficerLeaderboard({ scope = 'commune', communeCode, districtCode, limit = 10 }: LeaderboardProps) {
+export function OfficerLeaderboard({ scope = 'commune', wardId, provinceId, limit = 10 }: LeaderboardProps) {
   const [officers, setOfficers] = useState<OfficerStats[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
@@ -52,10 +52,10 @@ export function OfficerLeaderboard({ scope = 'commune', communeCode, districtCod
             profiles!inner(id, full_name, police_id)
           `)
 
-        if (scope === 'commune' && communeCode) {
-          query = query.eq('ward_code', communeCode)
-        } else if (scope === 'district' && districtCode) {
-          query = query.eq('district_code', districtCode)
+        if (scope === 'commune' && wardId) {
+          query = query.eq('ward_id', wardId)
+        } else if (scope === 'district' && provinceId) {
+          query = query.eq('province_id', provinceId)
         }
 
         const { data, error } = await query
@@ -120,7 +120,7 @@ export function OfficerLeaderboard({ scope = 'commune', communeCode, districtCod
     }
 
     fetchLeaderboard()
-  }, [scope, communeCode, districtCode, limit]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scope, wardId, provinceId, limit]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (

@@ -1,0 +1,86 @@
+[
+  {
+    "table_name": "approval_history",
+    "columns": "id, survey_location_id, action, actor_id, actor_role, previous_status, new_status, notes, metadata, created_at"
+  },
+  {
+    "table_name": "audit_logs",
+    "columns": "id, user_id, action, resource_type, resource_id, ip_address, user_agent, changes, created_at"
+  },
+  {
+    "table_name": "geography_columns",
+    "columns": "f_table_catalog, f_table_schema, f_table_name, f_geography_column, coord_dimension, srid, type"
+  },
+  {
+    "table_name": "geometry_columns",
+    "columns": "f_table_catalog, f_table_schema, f_table_name, f_geometry_column, coord_dimension, srid, type"
+  },
+  {
+    "table_name": "land_parcels",
+    "columns": "id, parcel_code, owner_name, owner_id_number, owner_phone, land_use_certificate_number, parcel_area_m2, land_use_type_code, geometry, created_at, updated_at, province_id, ward_id"
+  },
+  {
+    "table_name": "land_parcels_with_location",
+    "columns": "id, parcel_code, owner_name, owner_id_number, owner_phone, land_use_certificate_number, parcel_area_m2, land_use_type_code, geometry, created_at, updated_at, province_id, ward_id, province_code, province_name, ward_code, ward_name"
+  },
+  {
+    "table_name": "location_identifiers",
+    "columns": "id, survey_location_id, location_id, admin_code, sequence_number, assigned_by, assigned_at, is_active, deactivated_at, deactivated_by, deactivation_reason"
+  },
+  {
+    "table_name": "profiles",
+    "columns": "id, full_name, phone, police_id, unit, avatar_url, created_at, updated_at, role, province_id, ward_id"
+  },
+  {
+    "table_name": "profiles_with_location",
+    "columns": "id, full_name, phone, police_id, unit, avatar_url, created_at, updated_at, role, province_id, ward_id, province_code, province_name, ward_code, ward_name"
+  },
+  {
+    "table_name": "provinces",
+    "columns": "code, name, codename, division_type, phone_code, created_at, updated_at"
+  },
+  {
+    "table_name": "spatial_ref_sys",
+    "columns": "srid, auth_name, auth_srid, srtext, proj4text"
+  },
+  {
+    "table_name": "survey_entry_points",
+    "columns": "id, survey_location_id, sequence_number, latitude, longitude, elevation, gps_point, house_number, street, address_full, entry_type, is_primary, facing_direction, notes, created_at, updated_at"
+  },
+  {
+    "table_name": "survey_locations",
+    "columns": "id, surveyor_id, location_name, address, house_number, street, hamlet, latitude, longitude, accuracy, polygon_geometry, object_type, land_use_type, owner_name, owner_id_number, owner_phone, parcel_code, land_area_m2, photos, notes, status, location_identifier, created_at, updated_at, gps_point, rough_area, has_rough_area, gps_accuracy_m, gps_source, mission_id, assigned_to, client_local_id, synced_at, submitted_at, final_location_id, province_id, ward_id, entry_points"
+  },
+  {
+    "table_name": "survey_locations_with_location",
+    "columns": "id, surveyor_id, location_name, address, house_number, street, hamlet, latitude, longitude, accuracy, polygon_geometry, object_type, land_use_type, owner_name, owner_id_number, owner_phone, parcel_code, land_area_m2, photos, notes, status, location_identifier, created_at, updated_at, gps_point, rough_area, has_rough_area, gps_accuracy_m, gps_source, mission_id, assigned_to, client_local_id, synced_at, submitted_at, final_location_id, province_id, ward_id, province_code, province_name, province_codename, ward_code, ward_name, ward_codename"
+  },
+  {
+    "table_name": "survey_media",
+    "columns": "id, survey_location_id, media_type, file_path, thumbnail_path, captured_at, note, gps_point, created_at"
+  },
+  {
+    "table_name": "survey_vertices",
+    "columns": "id, survey_location_id, seq, lat, lng, created_at"
+  },
+  {
+    "table_name": "sync_events",
+    "columns": "id, profile_id, device_id, event_type, payload, created_at"
+  },
+  {
+    "table_name": "system_config",
+    "columns": "key, value, description, updated_by, updated_at"
+  },
+  {
+    "table_name": "wards",
+    "columns": "code, name, codename, division_type, province_code, created_at, updated_at"
+  },
+  {
+    "table_name": "web_users",
+    "columns": "id, profile_id, role, permissions, is_active, last_login, created_at, updated_at, province_id, ward_id"
+  },
+  {
+    "table_name": "web_users_with_location",
+    "columns": "id, profile_id, role, permissions, is_active, last_login, created_at, updated_at, province_id, ward_id, full_name, phone, police_id, province_code, province_name, ward_code, ward_name"
+  }
+]

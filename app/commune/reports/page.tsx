@@ -14,25 +14,31 @@ import { Database } from '@/lib/types/database'
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
 export default function ReportsPage() {
-  const { webUser } = useAuth()
+  const { webUser, loading: authLoading } = useAuth()
   const [surveys, setSurveys] = useState<SurveyLocation[]>([])
   const [filteredSurveys, setFilteredSurveys] = useState<SurveyLocation[]>([])
   const [statusFilter, setStatusFilter] = useState('')
   const [objectTypeFilter, setObjectTypeFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
     async function fetchSurveys() {
-      if (!webUser) return
+      // Wait for auth to finish loading
+      if (authLoading) return
+
+      if (!webUser || !webUser.ward_id) {
+        setDataLoading(false)
+        return
+      }
 
       try {
         const { data, error } = await supabase
           .from('survey_locations')
           .select('*')
-          .eq('ward_code', webUser.commune_code)
+          .eq('ward_id', webUser.ward_id)
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -41,12 +47,14 @@ export default function ReportsPage() {
       } catch (error) {
         console.error('Error fetching surveys:', error)
       } finally {
-        setLoading(false)
+        setDataLoading(false)
       }
     }
 
     fetchSurveys()
-  }, [webUser, supabase])
+  }, [webUser, authLoading, supabase])
+
+  const loading = authLoading || dataLoading
 
   useEffect(() => {
     let filtered = surveys

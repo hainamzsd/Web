@@ -71,13 +71,14 @@ export function ProcessClient({ initialSurveys, initialStats }: ProcessClientPro
   }
 
   const fetchSurveys = async () => {
-    if (!webUser) return
+    if (!webUser || !webUser.ward_id) return
     setRefreshing(true)
 
     try {
       let query = supabase
         .from('survey_locations')
         .select('*')
+        .eq('ward_id', webUser.ward_id)
         .order('created_at', { ascending: false })
 
       if (statusFilter !== 'all') {
@@ -99,7 +100,7 @@ export function ProcessClient({ initialSurveys, initialStats }: ProcessClientPro
   }
 
   const fetchStats = async () => {
-    if (!webUser) return
+    if (!webUser || !webUser.ward_id) return
 
     try {
       const statuses = ['pending', 'reviewed', 'approved_commune', 'rejected']
@@ -108,6 +109,7 @@ export function ProcessClient({ initialSurveys, initialStats }: ProcessClientPro
           const { count } = await supabase
             .from('survey_locations')
             .select('*', { count: 'exact', head: true })
+            .eq('ward_id', webUser.ward_id)
             .eq('status', status)
           return count || 0
         })

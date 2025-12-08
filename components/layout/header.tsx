@@ -6,12 +6,13 @@ import { LogOut, User } from 'lucide-react'
 
 export function Header() {
   const { user, webUser, signOut } = useAuth()
-
+  
   const handleSignOut = async () => {
     await signOut()
     window.location.href = '/login'
   }
 
+  
   const roleLabels: Record<string, string> = {
     commune_officer: 'Cán bộ Xã',
     commune_supervisor: 'Công an tỉnh/thành phố',
