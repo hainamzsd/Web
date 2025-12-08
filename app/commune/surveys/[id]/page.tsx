@@ -71,6 +71,7 @@ export default function SurveyDetailPage() {
     if (authLoading) return
 
     let mounted = true
+    setDataLoading(true)
 
     async function fetchSurvey() {
       if (!params?.id) {
@@ -79,35 +80,29 @@ export default function SurveyDetailPage() {
       }
 
       try {
-        // Fetch survey with province/ward names
+        // Fetch survey with province/ward names and surveyor profile
         const { data, error } = await supabase
           .from('survey_locations')
           .select(`
             *,
             province:provinces!survey_locations_province_id_fkey(name),
-            ward:wards!survey_locations_ward_id_fkey(name)
+            ward:wards!survey_locations_ward_id_fkey(name),
+            surveyor:profiles!survey_locations_surveyor_id_fkey(full_name, phone, unit)
           `)
           .eq('id', params.id as string)
           .single()
 
-        if (error && error.code !== 'PGRST116') {
+        if (error) {
+          console.error('Error fetching survey:', error)
           throw error
         }
 
         if (mounted && data) {
           setSurvey(data)
 
-          // Fetch surveyor profile
-          if (data.surveyor_id) {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('full_name, phone, unit')
-              .eq('id', data.surveyor_id)
-              .single()
-
-            if (mounted && profileData) {
-              setSurveyorProfile(profileData)
-            }
+          // Set surveyor profile from joined data
+          if (data.surveyor) {
+            setSurveyorProfile(data.surveyor as SurveyorProfile)
           }
 
           // Fetch approval history
@@ -131,6 +126,7 @@ export default function SurveyDetailPage() {
           }
         }
       } catch (error) {
+        console.error('fetchSurvey error:', error)
         if (mounted) {
           toast.error("Lỗi", {
             description: "Không thể tải thông tin khảo sát.",
@@ -188,33 +184,56 @@ export default function SurveyDetailPage() {
   }
 
   const handleSave = async () => {
-    if (!survey || !user) return
+    if (!survey || !user) {
+      toast.error("Lỗi", { description: "Không có dữ liệu khảo sát hoặc chưa đăng nhập" })
+      return
+    }
     setSaving(true)
 
     try {
-      const { error } = await supabase
+      const updateData = {
+        location_name: survey.location_name,
+        owner_name: survey.owner_name,
+        owner_phone: survey.owner_phone,
+        owner_id_number: survey.owner_id_number,
+        notes: survey.notes,
+        land_area_m2: survey.land_area_m2,
+        object_type: survey.object_type,
+        land_use_type: survey.land_use_type,
+        updated_at: new Date().toISOString(),
+      }
+
+      console.log('Updating survey:', survey.id, updateData)
+
+      const { data, error, count } = await supabase
         .from('survey_locations')
-        .update({
-          location_name: survey.location_name,
-          owner_name: survey.owner_name,
-          owner_phone: survey.owner_phone,
-          owner_id_number: survey.owner_id_number,
-          notes: survey.notes,
-          land_area_m2: survey.land_area_m2,
-          object_type: survey.object_type,
-          land_use_type: survey.land_use_type,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', survey.id)
+        .select()
 
-      if (error) throw error
+      console.log('Update result:', { data, error, count })
 
+      if (error) {
+        console.error('Save error:', error)
+        throw error
+      }
+
+      if (!data || data.length === 0) {
+        toast.error("Lỗi", {
+          description: "Không thể cập nhật. Có thể bạn không có quyền chỉnh sửa hồ sơ này.",
+        })
+        return
+      }
+
+      // Update local state with saved data
+      setSurvey(data[0])
       toast.success("Thành công", {
         description: "Đã lưu thay đổi!",
       })
-    } catch (error) {
+    } catch (error: any) {
+      console.error('handleSave error:', error)
       toast.error("Lỗi", {
-        description: "Lỗi khi lưu!",
+        description: error?.message || "Lỗi khi lưu!",
       })
     } finally {
       setSaving(false)
@@ -222,41 +241,75 @@ export default function SurveyDetailPage() {
   }
 
   const handleSubmitForReview = async () => {
-    if (!survey || !user) return
+    if (!survey || !user) {
+      toast.error("Lỗi", { description: "Không có dữ liệu hoặc chưa đăng nhập" })
+      return
+    }
+
+    // Confirm before submitting
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn gửi hồ sơ "${survey.location_name || 'Chưa đặt tên'}" để xem xét?\n\nSau khi gửi, hồ sơ sẽ được chuyển cho cấp trên xem xét và phê duyệt.`
+    )
+    if (!confirmed) return
+
     setSaving(true)
 
     try {
-      const { error: updateError } = await supabase
+      // Update status
+      const { data: updateData, error: updateError } = await supabase
         .from('survey_locations')
         .update({
           status: 'reviewed',
           updated_at: new Date().toISOString(),
         })
         .eq('id', survey.id)
+        .select()
 
-      if (updateError) throw updateError
+      console.log('Submit result:', { updateData, updateError })
 
+      if (updateError) {
+        console.error('Update error:', updateError)
+        throw updateError
+      }
+
+      if (!updateData || updateData.length === 0) {
+        throw new Error('Không thể cập nhật trạng thái. Có thể bạn không có quyền.')
+      }
+
+      // Add to approval history
       const { error: historyError } = await supabase
         .from('approval_history')
         .insert({
           survey_location_id: survey.id,
-          action: 'reviewed',
+          action: 'submitted',
           actor_id: user.id,
           actor_role: webUser?.role || 'commune_officer',
           previous_status: survey.status,
           new_status: 'reviewed',
-          notes: 'Submitted for supervisor review',
+          notes: 'Cán bộ xã đã xem xét và gửi lên cấp trên',
         })
 
-      if (historyError) throw historyError
+      if (historyError) {
+        console.error('History error:', historyError)
+        // Don't throw - status already updated
+      }
 
-      toast.success("Thành công", {
-        description: "Đã gửi để xem xét!",
+      toast.success("Gửi thành công!", {
+        description: `Hồ sơ "${survey.location_name || 'Chưa đặt tên'}" đã được gửi để xem xét. Trạng thái: Đã xem xét`,
+        duration: 5000,
       })
-      router.push('/commune/surveys')
-    } catch (error) {
+
+      // Update local state to reflect change
+      setSurvey({ ...survey, status: 'reviewed' })
+
+      // Redirect after a short delay so user sees the success message
+      setTimeout(() => {
+        router.push('/commune/surveys')
+      }, 1500)
+    } catch (error: any) {
+      console.error('handleSubmitForReview error:', error)
       toast.error("Lỗi", {
-        description: "Lỗi khi gửi!",
+        description: error?.message || "Lỗi khi gửi hồ sơ!",
       })
     } finally {
       setSaving(false)
@@ -357,13 +410,19 @@ export default function SurveyDetailPage() {
           <div className="flex gap-2">
             <Button onClick={handleSave} disabled={saving} variant="outline" className="gap-2">
               <Save className="h-4 w-4" />
-              Lưu
+              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
             </Button>
             {survey.status === 'pending' && (
-              <Button onClick={handleSubmitForReview} disabled={saving} className="gap-2">
+              <Button onClick={handleSubmitForReview} disabled={saving} className="gap-2 bg-green-600 hover:bg-green-700">
                 <Send className="h-4 w-4" />
-                Gửi xem xét
+                {saving ? 'Đang gửi...' : 'Gửi lên cấp trên'}
               </Button>
+            )}
+            {survey.status === 'reviewed' && (
+              <span className="flex items-center gap-2 px-4 py-2 bg-sky-100 text-sky-700 rounded-md text-sm font-medium">
+                <Send className="h-4 w-4" />
+                Đã gửi xem xét
+              </span>
             )}
           </div>
         </div>
@@ -421,7 +480,7 @@ export default function SurveyDetailPage() {
                   <div>
                     <p className="text-xs text-green-600 font-medium">Độ chính xác GPS</p>
                     <p className="text-lg font-bold text-green-900">
-                      {survey.accuracy ? `±${survey.accuracy}m` : 'N/A'}
+                      {survey.accuracy != null ? `±${survey.accuracy.toFixed(2)}m` : 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -653,10 +712,11 @@ export default function SurveyDetailPage() {
                 <EnhancedSurveyMap
                   surveys={[survey]}
                   center={survey.latitude && survey.longitude ? [survey.latitude, survey.longitude] : undefined}
-                  zoom={17}
+                  zoom={18}
                   showHeatmap={false}
                   showClustering={false}
                   enableDrawing={false}
+                  entryPoints={entryPoints}
                 />
               </div>
             </CardContent>
@@ -774,7 +834,7 @@ export default function SurveyDetailPage() {
                   <label className="text-sm font-medium text-gray-700">Độ chính xác</label>
                   <input
                     type="text"
-                    value={survey.accuracy ? `±${survey.accuracy}m` : 'N/A'}
+                    value={survey.accuracy != null ? `±${survey.accuracy.toFixed(2)}m` : 'N/A'}
                     readOnly
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 bg-gray-50"
                   />

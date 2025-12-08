@@ -61,8 +61,8 @@ export function Header() {
                 </div>
               </div>
 
-              <Avatar className="h-9 w-9 border border-gray-200">
-                <AvatarImage src={webUser.profile?.avatar_url || ''} alt={webUser.profile?.full_name || 'User'} />
+              <Avatar className="h-9 w-9 border border-gray-200 object-contain">
+                <AvatarImage src={"https://upload.wikimedia.org/wikipedia/commons/3/3c/Vietnam_People%27s_Public_Security_Emblem.png"} alt={webUser.profile?.full_name || 'User'} />
                 <AvatarFallback className="bg-blue-50 text-blue-700 font-medium">
                   {webUser.profile?.full_name ? getInitials(webUser.profile.full_name) : 'U'}
                 </AvatarFallback>

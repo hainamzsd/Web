@@ -1,179 +1,320 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useAuth } from '@/lib/auth/auth-context'
 import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle, Clock, FileText, TrendingUp, TrendingDown, Shield } from 'lucide-react'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import {
+  ClipboardCheck,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  FileText,
+  TrendingUp,
+  ArrowUpRight,
+  ArrowDownRight,
+  BarChart3
+} from 'lucide-react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
-const COLORS = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444']
+interface Stats {
+  pending: number
+  reviewed: number
+  approved: number
+  rejected: number
+  total: number
+  thisWeek: number
+  lastWeek: number
+}
 
 export default function SupervisorDashboardPage() {
-  const [stats, setStats] = useState({ pendingReviews: 0, approved: 0, total: 0, rejected: 0, thisWeek: 0, lastWeek: 0 })
-  const [statusData, setStatusData] = useState<{ name: string; value: number }[]>([])
+  const { webUser, loading: authLoading } = useAuth()
+  const [stats, setStats] = useState<Stats>({
+    pending: 0,
+    reviewed: 0,
+    approved: 0,
+    rejected: 0,
+    total: 0,
+    thisWeek: 0,
+    lastWeek: 0
+  })
+  const [recentSurveys, setRecentSurveys] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
-    async function fetchStats() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+    if (authLoading) return
 
-      const { data: webUser } = await supabase
-        .from('web_users')
-        .select('province_code, province_id')
-        .eq('profile_id', user.id)
-        .single()
-
-      if (!webUser) return
-
-      // Build query - filter by province_id if available, otherwise by province_code
-      let query = supabase
-        .from('survey_locations')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (webUser.province_id) {
-        query = query.eq('province_id', webUser.province_id)
-      } else if (webUser.province_code) {
-        query = query.eq('province_code', webUser.province_code)
-      } else {
+    async function fetchData() {
+      if (!webUser) {
+        setLoading(false)
         return
       }
 
-      const { data } = await query
+      try {
+        // Build query based on available filters
+        let query = supabase
+          .from('survey_locations')
+          .select('*')
+          .order('created_at', { ascending: false })
 
-      if (!data) return
+        // Filter by ward_id first, then province_id, then province_code
+        if (webUser.ward_id) {
+          query = query.eq('ward_id', webUser.ward_id)
+        } else if (webUser.province_id) {
+          query = query.eq('province_id', webUser.province_id)
+        } else if (webUser.province_code) {
+          query = query.eq('province_code', webUser.province_code)
+        }
 
-      const now = new Date()
-      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+        const { data, error } = await query
 
-      const counts = data.reduce((acc, item) => {
-        const createdAt = new Date(item.created_at)
-        acc.total++
-        if (item.status === 'reviewed') acc.pendingReviews++
-        else if (item.status === 'approved_commune') acc.approved++
-        else if (item.status === 'rejected') acc.rejected++
-        if (createdAt >= oneWeekAgo) acc.thisWeek++
-        else if (createdAt >= twoWeeksAgo) acc.lastWeek++
-        return acc
-      }, { pendingReviews: 0, approved: 0, total: 0, rejected: 0, thisWeek: 0, lastWeek: 0 })
+        if (error) {
+          console.error('Error fetching surveys:', error)
+          return
+        }
 
-      setStats(counts)
-      setStatusData([
-        { name: 'Chờ duyệt', value: counts.pendingReviews },
-        { name: 'Đã duyệt', value: counts.approved },
-        { name: 'Đã xử lý', value: counts.total - counts.pendingReviews - counts.approved - counts.rejected },
-        { name: 'Từ chối', value: counts.rejected },
-      ])
+        if (!data) return
+
+        const now = new Date()
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+
+        const counts = data.reduce((acc, item) => {
+          const createdAt = new Date(item.created_at)
+          acc.total++
+
+          if (item.status === 'pending') acc.pending++
+          else if (item.status === 'reviewed') acc.reviewed++
+          else if (item.status === 'approved_commune') acc.approved++
+          else if (item.status === 'rejected') acc.rejected++
+
+          if (createdAt >= oneWeekAgo) acc.thisWeek++
+          else if (createdAt >= twoWeeksAgo) acc.lastWeek++
+
+          return acc
+        }, { pending: 0, reviewed: 0, approved: 0, rejected: 0, total: 0, thisWeek: 0, lastWeek: 0 })
+
+        setStats(counts)
+        setRecentSurveys(data.slice(0, 5))
+      } catch (error) {
+        console.error('Error:', error)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    fetchStats()
-  }, [])
+    fetchData()
+  }, [webUser, authLoading])
 
-  const weeklyGrowth = stats.lastWeek > 0
-    ? ((stats.thisWeek - stats.lastWeek) / stats.lastWeek * 100).toFixed(1)
-    : stats.thisWeek > 0 ? '100' : '0'
-  const isGrowing = parseFloat(weeklyGrowth) >= 0
+  const weeklyChange = stats.lastWeek > 0
+    ? ((stats.thisWeek - stats.lastWeek) / stats.lastWeek * 100)
+    : stats.thisWeek > 0 ? 100 : 0
+
+  const approvalRate = stats.total > 0
+    ? ((stats.approved / stats.total) * 100).toFixed(0)
+    : '0'
+
+  if (loading || authLoading) {
+    return (
+      <div className="flex items-center justify-center h-[50vh]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  const needsReview = stats.pending + stats.reviewed
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-green-600 to-emerald-700 -m-6 mb-6 p-6 rounded-lg text-white">
-        <div className="flex items-center gap-3 mb-2">
-          <Shield className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Dashboard Giám sát</h1>
-        </div>
-        <p className="text-green-100 mt-1">Tổng quan các khảo sát cần xem xét và phê duyệt</p>
-        <div className="flex items-center gap-4 mt-4">
-          <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
-            <div className="text-sm text-green-100">Tuần này</div>
-            <div className="text-2xl font-bold">{stats.thisWeek}</div>
-          </div>
-          <div className="flex items-center gap-1">
-            {isGrowing ? <TrendingUp className="h-5 w-5 text-green-300" /> : <TrendingDown className="h-5 w-5 text-red-300" />}
-            <span className={`text-lg font-semibold ${isGrowing ? 'text-green-300' : 'text-red-300'}`}>{weeklyGrowth}%</span>
-          </div>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Tổng quan hoạt động xem xét và phê duyệt khảo sát
+        </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-orange-100 text-sm font-medium">Chờ xem xét</p>
-              <p className="text-4xl font-bold mt-2">{stats.pendingReviews}</p>
-              <p className="text-orange-100 text-xs mt-1">Cần phê duyệt ngay</p>
-            </div>
-            <Clock className="h-14 w-14 text-orange-100 opacity-80" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-500 to-teal-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-green-100 text-sm font-medium">Đã phê duyệt</p>
-              <p className="text-4xl font-bold mt-2">{stats.approved}</p>
-              <p className="text-green-100 text-xs mt-1">Hoàn tất trong tháng</p>
-            </div>
-            <CheckCircle className="h-14 w-14 text-green-100 opacity-80" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm font-medium">Tổng số</p>
-              <p className="text-4xl font-bold mt-2">{stats.total}</p>
-              <p className="text-blue-100 text-xs mt-1">Khảo sát trong tỉnh</p>
-            </div>
-            <FileText className="h-14 w-14 text-blue-100 opacity-80" />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="shadow-xl">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-            <CardTitle>Phân bố trạng thái</CardTitle>
+      {/* Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Cần xem xét</CardTitle>
+            <Clock className="h-4 w-4 text-amber-500" />
           </CardHeader>
-          <CardContent className="pt-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie data={statusData} cx="50%" cy="50%" labelLine={false} label={({ name, value }) => `${name}: ${value}`} outerRadius={100} dataKey="value">
-                  {statusData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '2px solid #e5e7eb', borderRadius: '12px', padding: '12px' }} />
-              </PieChart>
-            </ResponsiveContainer>
+          <CardContent>
+            <div className="text-2xl font-bold">{needsReview}</div>
+            <p className="text-xs text-gray-500 mt-1">
+              {stats.pending} mới, {stats.reviewed} đã xem
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-xl">
-          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
-            <CardTitle>Hiệu suất xử lý</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Đã phê duyệt</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-5 rounded-xl">
-                <div className="text-sm text-blue-700 font-medium">Tỷ lệ phê duyệt</div>
-                <div className="text-4xl font-bold text-blue-900 mt-2">
-                  {stats.total > 0 ? ((stats.approved / stats.total) * 100).toFixed(0) : 0}%
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.approved}</div>
+            <p className="text-xs text-gray-500 mt-1">
+              Tỷ lệ duyệt: {approvalRate}%
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Từ chối</CardTitle>
+            <XCircle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.rejected}</div>
+            <p className="text-xs text-gray-500 mt-1">
+              Cần xem lại
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">Tổng khảo sát</CardTitle>
+            <FileText className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="flex items-center text-xs mt-1">
+              {weeklyChange >= 0 ? (
+                <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
+              ) : (
+                <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
+              )}
+              <span className={weeklyChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                {Math.abs(weeklyChange).toFixed(0)}%
+              </span>
+              <span className="text-gray-500 ml-1">so với tuần trước</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Two Column Layout */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Recent Surveys */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Khảo sát gần đây</CardTitle>
+                <CardDescription>5 khảo sát mới nhất trong khu vực</CardDescription>
+              </div>
+              <Link href="/supervisor/reviews">
+                <Button variant="ghost" size="sm">
+                  Xem tất cả
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {recentSurveys.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">
+                Chưa có khảo sát nào
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentSurveys.map((survey) => (
+                  <Link
+                    key={survey.id}
+                    href={`/supervisor/reviews/${survey.id}`}
+                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {survey.location_name || 'Chưa đặt tên'}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {survey.address || 'Chưa có địa chỉ'}
+                      </p>
+                    </div>
+                    <div className="ml-4 flex-shrink-0">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                        ${survey.status === 'pending' ? 'bg-amber-100 text-amber-700' : ''}
+                        ${survey.status === 'reviewed' ? 'bg-blue-100 text-blue-700' : ''}
+                        ${survey.status === 'approved_commune' ? 'bg-green-100 text-green-700' : ''}
+                        ${survey.status === 'rejected' ? 'bg-red-100 text-red-700' : ''}
+                      `}>
+                        {survey.status === 'pending' && 'Chờ xử lý'}
+                        {survey.status === 'reviewed' && 'Đã xem xét'}
+                        {survey.status === 'approved_commune' && 'Đã duyệt'}
+                        {survey.status === 'rejected' && 'Từ chối'}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Thống kê nhanh</CardTitle>
+            <CardDescription>Tình hình xử lý trong tuần</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Khảo sát tuần này</span>
+                <span className="text-sm font-semibold">{stats.thisWeek}</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div
+                  className="bg-blue-500 h-2 rounded-full transition-all"
+                  style={{ width: `${Math.min((stats.thisWeek / Math.max(stats.total, 1)) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Tỷ lệ phê duyệt</span>
+                <span className="text-sm font-semibold">{approvalRate}%</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div
+                  className="bg-green-500 h-2 rounded-full transition-all"
+                  style={{ width: `${approvalRate}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Tỷ lệ từ chối</span>
+                <span className="text-sm font-semibold">
+                  {stats.total > 0 ? ((stats.rejected / stats.total) * 100).toFixed(0) : 0}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div
+                  className="bg-red-500 h-2 rounded-full transition-all"
+                  style={{ width: `${stats.total > 0 ? (stats.rejected / stats.total) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t">
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-2xl font-bold text-gray-900">{stats.thisWeek}</p>
+                  <p className="text-xs text-gray-500">Tuần này</p>
                 </div>
-                <div className="text-xs text-blue-600 mt-1">{stats.approved}/{stats.total} khảo sát</div>
-              </div>
-
-              <div className="bg-gradient-to-r from-amber-50 to-orange-100 p-5 rounded-xl">
-                <div className="text-sm text-amber-700 font-medium">Đang chờ</div>
-                <div className="text-4xl font-bold text-amber-900 mt-2">{stats.pendingReviews}</div>
-                <div className="text-xs text-amber-600 mt-1">Cần xem xét</div>
-              </div>
-
-              <div className="bg-gradient-to-r from-red-50 to-rose-100 p-5 rounded-xl">
-                <div className="text-sm text-red-700 font-medium">Từ chối</div>
-                <div className="text-4xl font-bold text-red-900 mt-2">{stats.rejected}</div>
-                <div className="text-xs text-red-600 mt-1">Cần xem lại</div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-2xl font-bold text-gray-900">{stats.lastWeek}</p>
+                  <p className="text-xs text-gray-500">Tuần trước</p>
+                </div>
               </div>
             </div>
           </CardContent>

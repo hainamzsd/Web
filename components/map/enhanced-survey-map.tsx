@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Database } from '@/lib/types/database'
+import { EntryPoint, ENTRY_TYPE_LABELS } from '@/lib/types/entry-points'
+import { X, MapPin, User, Ruler, Navigation, Calendar, ExternalLink } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet-draw/dist/leaflet.draw.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
@@ -20,6 +22,8 @@ interface EnhancedSurveyMapProps {
   onPolygonDrawn?: (polygon: any) => void
   selectedSurveyId?: string | null
   onSurveySelect?: (survey: SurveyLocation | null) => void
+  entryPoints?: EntryPoint[]
+  showInfoCard?: boolean
 }
 
 function EnhancedSurveyMapComponent({
@@ -31,7 +35,9 @@ function EnhancedSurveyMapComponent({
   enableDrawing = false,
   onPolygonDrawn,
   selectedSurveyId,
-  onSurveySelect
+  onSurveySelect,
+  entryPoints = [],
+  showInfoCard = true
 }: EnhancedSurveyMapProps) {
   const mapRef = useRef<any>(null)
   const leafletRef = useRef<any>(null)
@@ -40,6 +46,7 @@ function EnhancedSurveyMapComponent({
   const drawControlRef = useRef<any>(null)
   const drawnItemsRef = useRef<any>(null)
   const polygonLayerRef = useRef<any>(null)
+  const entryPointsLayerRef = useRef<any>(null)
   const [mapMode, setMapMode] = useState<'markers' | 'heatmap' | 'clusters'>('markers')
   const [mapId] = useState(`enhanced-map-${Math.random().toString(36).substr(2, 9)}`)
   const [isMapReady, setIsMapReady] = useState(false)
@@ -116,10 +123,146 @@ function EnhancedSurveyMapComponent({
         polygonLayerRef.current = polygon
 
         // Fit map to polygon bounds
-        mapRef.current.fitBounds(polygon.getBounds(), { padding: [50, 50], maxZoom: 18 })
+        mapRef.current.fitBounds(polygon.getBounds(), { padding: [50, 50], maxZoom: 20 })
       }
     }
   }, [selectedSurvey, isMapReady])
+
+  // Display entry points on map
+  useEffect(() => {
+    if (!mapRef.current || !leafletRef.current || !isMapReady) return
+
+    const L = leafletRef.current
+
+    // Clear existing entry points layer
+    if (entryPointsLayerRef.current) {
+      mapRef.current.removeLayer(entryPointsLayerRef.current)
+      entryPointsLayerRef.current = null
+    }
+
+    if (entryPoints.length === 0) return
+
+    const entryPointsLayer = L.layerGroup()
+
+    entryPoints.forEach((ep, index) => {
+      const isPrimary = ep.isPrimary
+      const bgColor = isPrimary ? '#16a34a' : '#22c55e'
+      const borderColor = isPrimary ? '#15803d' : '#16a34a'
+
+      // Create custom icon for entry point
+      const icon = L.divIcon({
+        className: 'entry-point-marker',
+        html: `
+          <div style="
+            position: relative;
+            width: 28px;
+            height: 28px;
+          ">
+            <div style="
+              background-color: ${bgColor};
+              width: 28px;
+              height: 28px;
+              border-radius: 50%;
+              border: 3px solid ${borderColor};
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            ">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </div>
+            ${isPrimary ? `
+              <div style="
+                position: absolute;
+                top: -6px;
+                right: -6px;
+                background-color: #f59e0b;
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                border: 2px solid white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">
+                <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </div>
+            ` : ''}
+            <div style="
+              position: absolute;
+              bottom: -18px;
+              left: 50%;
+              transform: translateX(-50%);
+              background-color: white;
+              color: #374151;
+              font-size: 10px;
+              font-weight: 600;
+              padding: 1px 4px;
+              border-radius: 3px;
+              white-space: nowrap;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            ">#${ep.sequenceNumber}</div>
+          </div>
+        `,
+        iconSize: [28, 46],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14],
+      })
+
+      const marker = L.marker([ep.latitude, ep.longitude], { icon })
+
+      const typeLabel = ENTRY_TYPE_LABELS[ep.entryType] || ep.entryType
+      const directionLabel = ep.facingDirection ? `Hướng: ${ep.facingDirection}` : ''
+
+      marker.bindPopup(`
+        <div style="min-width: 180px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <div style="
+              background-color: ${bgColor};
+              width: 24px;
+              height: 24px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            ">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </div>
+            <div>
+              <h3 style="font-weight: bold; color: ${bgColor}; margin: 0; font-size: 13px;">
+                Lối vào #${ep.sequenceNumber}
+              </h3>
+              ${isPrimary ? '<span style="font-size: 10px; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 3px;">Chính</span>' : ''}
+            </div>
+          </div>
+          <div style="font-size: 12px; color: #666; space-y: 4px;">
+            <p style="margin: 4px 0;"><strong>Loại:</strong> ${typeLabel}</p>
+            ${directionLabel ? `<p style="margin: 4px 0;"><strong>${directionLabel}</strong></p>` : ''}
+            ${ep.addressFull ? `<p style="margin: 4px 0;"><strong>Địa chỉ:</strong> ${ep.addressFull}</p>` : ''}
+            ${ep.notes ? `<p style="margin: 4px 0; font-style: italic; color: #888;">"${ep.notes}"</p>` : ''}
+          </div>
+          <div style="font-size: 10px; color: #999; margin-top: 8px; font-family: monospace;">
+            ${ep.latitude.toFixed(6)}, ${ep.longitude.toFixed(6)}
+          </div>
+        </div>
+      `)
+
+      entryPointsLayer.addLayer(marker)
+    })
+
+    entryPointsLayer.addTo(mapRef.current)
+    entryPointsLayerRef.current = entryPointsLayer
+  }, [entryPoints, isMapReady])
 
   // Initialize map
   useEffect(() => {
@@ -146,7 +289,7 @@ function EnhancedSurveyMapComponent({
 
       leafletRef.current.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 19,
+        maxZoom: 22,
       }).addTo(map)
 
       mapRef.current = map
@@ -263,7 +406,7 @@ function EnhancedSurveyMapComponent({
         const heat = (L as any).heatLayer(heatPoints, {
           radius: 25,
           blur: 15,
-          maxZoom: 17,
+          maxZoom: 20,
           gradient: {
             0.0: '#3b82f6',
             0.5: '#f59e0b',
@@ -401,6 +544,10 @@ function EnhancedSurveyMapComponent({
             if (onSurveySelect) {
               onSurveySelect(survey)
             }
+            // Auto zoom to the selected point
+            if (mapRef.current) {
+              mapRef.current.setView([survey.latitude!, survey.longitude!], 19, { animate: true })
+            }
           })
 
           markerLayer.addLayer(marker)
@@ -409,14 +556,48 @@ function EnhancedSurveyMapComponent({
         markerLayer.addTo(mapRef.current)
         markerLayerRef.current = markerLayer
 
-        // Fit bounds
-        const bounds = L.latLngBounds(validSurveys.map(s => [s.latitude!, s.longitude!]))
-        mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 })
+        // Fit bounds only if no survey is selected
+        if (!selectedSurvey) {
+          const bounds = L.latLngBounds(validSurveys.map(s => [s.latitude!, s.longitude!]))
+          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 })
+        }
       }
     }
 
     updateMarkers()
   }, [surveys, mapMode, showHeatmap, showClustering, selectedSurveyId, isMapReady])
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: 'Chờ xử lý',
+      reviewed: 'Đã xem xét',
+      approved_commune: 'Đã duyệt (Xã)',
+      approved_central: 'Đã duyệt (TW)',
+      published: 'Đã công bố',
+      rejected: 'Từ chối'
+    }
+    return labels[status] || status
+  }
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: 'bg-amber-100 text-amber-700',
+      reviewed: 'bg-sky-100 text-sky-700',
+      approved_commune: 'bg-purple-100 text-purple-700',
+      approved_central: 'bg-blue-100 text-blue-700',
+      published: 'bg-green-100 text-green-700',
+      rejected: 'bg-red-100 text-red-700'
+    }
+    return colors[status] || 'bg-gray-100 text-gray-700'
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    })
+  }
 
   return (
     <div className="relative">
@@ -482,7 +663,127 @@ function EnhancedSurveyMapComponent({
             <span>Từ chối</span>
           </div>
         </div>
+        {entryPoints.length > 0 && (
+          <>
+            <hr className="my-2 border-gray-200" />
+            <h4 className="font-semibold text-sm mb-2">Lối vào</h4>
+            <div className="space-y-1 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-600"></div>
+                <span>Lối vào chính</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                <span>Lối vào phụ</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Info Card - Bottom Right */}
+      {showInfoCard && selectedSurvey && (
+        <div className="absolute bottom-4 right-4 z-[1000] bg-white rounded-xl shadow-xl border border-gray-200 w-80 overflow-hidden animate-in slide-in-from-right-5 duration-300">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 text-white">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm truncate">
+                  {selectedSurvey.location_name || 'Chưa đặt tên'}
+                </h3>
+                <p className="text-blue-100 text-xs mt-0.5 truncate">
+                  {selectedSurvey.address || 'Chưa có địa chỉ'}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedSurvey(null)}
+                className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 space-y-3">
+            {/* Status */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">Trạng thái</span>
+              <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(selectedSurvey.status)}`}>
+                {getStatusLabel(selectedSurvey.status)}
+              </span>
+            </div>
+
+            {/* Quick Info Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {selectedSurvey.owner_name && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-400" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500">Chủ sở hữu</p>
+                    <p className="text-sm font-medium truncate">{selectedSurvey.owner_name}</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedSurvey.land_area_m2 && (
+                <div className="flex items-center gap-2">
+                  <Ruler className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="text-xs text-gray-500">Diện tích</p>
+                    <p className="text-sm font-medium">{selectedSurvey.land_area_m2.toLocaleString('vi-VN')} m²</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Navigation className="h-4 w-4 text-gray-400" />
+                <div>
+                  <p className="text-xs text-gray-500">Tọa độ</p>
+                  <p className="text-xs font-mono">{selectedSurvey.latitude.toFixed(5)}, {selectedSurvey.longitude.toFixed(5)}</p>
+                </div>
+              </div>
+
+              {selectedSurvey.accuracy && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <p className="text-xs text-gray-500">Độ chính xác</p>
+                    <p className="text-sm font-medium">±{selectedSurvey.accuracy.toFixed(2)}m</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Date */}
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+              <Calendar className="h-4 w-4 text-gray-400" />
+              <span className="text-xs text-gray-500">Ngày tạo: {formatDate(selectedSurvey.created_at)}</span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-2">
+              <a
+                href={`/commune/surveys/${selectedSurvey.id}`}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Xem chi tiết
+              </a>
+              <button
+                onClick={() => {
+                  if (mapRef.current) {
+                    mapRef.current.setView([selectedSurvey.latitude, selectedSurvey.longitude], 20, { animate: true })
+                  }
+                }}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+              >
+                Zoom
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
