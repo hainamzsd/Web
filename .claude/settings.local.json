@@ -16,7 +16,8 @@
       "Bash(npx kill-port:*)",
       "Bash(taskkill:*)",
       "Bash(set NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co)",
-      "Bash(set:*)"
+      "Bash(set:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

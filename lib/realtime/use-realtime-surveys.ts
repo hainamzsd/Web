@@ -74,7 +74,8 @@ export function useRealtimeSurveys(options: UseRealtimeSurveysOptions = {}) {
     return () => {
       channel.unsubscribe()
     }
-  }, [wardCode, enabled, supabase])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wardCode, enabled])
 
   return { surveys, loading, setSurveys }
 }

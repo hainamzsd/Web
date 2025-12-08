@@ -4,17 +4,19 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
-import { Eye, Search } from 'lucide-react'
+import { Eye, Search, LogIn } from 'lucide-react'
 import Link from 'next/link'
 import { Database } from '@/lib/types/database'
+import { EntryPointsBadge } from '@/components/survey/entry-points-section'
 
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
 interface SurveysClientProps {
   initialSurveys: SurveyLocation[]
+  entryPointCounts?: Record<string, number>
 }
 
-export function SurveysClient({ initialSurveys }: SurveysClientProps) {
+export function SurveysClient({ initialSurveys, entryPointCounts = {} }: SurveysClientProps) {
   const [surveys] = useState<SurveyLocation[]>(initialSurveys)
   const [filteredSurveys, setFilteredSurveys] = useState<SurveyLocation[]>(initialSurveys)
   const [searchTerm, setSearchTerm] = useState('')
@@ -111,6 +113,9 @@ export function SurveysClient({ initialSurveys }: SurveysClientProps) {
                       Trạng thái
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">
+                      Lối vào
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">
                       Ngày tạo
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-gray-700">
@@ -132,6 +137,9 @@ export function SurveysClient({ initialSurveys }: SurveysClientProps) {
                       </td>
                       <td className="py-3 px-4">
                         <StatusBadge status={survey.status} />
+                      </td>
+                      <td className="py-3 px-4">
+                        <EntryPointsBadge count={entryPointCounts[survey.id] || 0} />
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {new Date(survey.created_at).toLocaleDateString('vi-VN')}

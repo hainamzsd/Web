@@ -9,9 +9,12 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, LogIn } from 'lucide-react'
 import Link from 'next/link'
 import { Database } from '@/lib/types/database'
+import { EntryPointsSection } from '@/components/survey/entry-points-section'
+import { EntryPoint } from '@/lib/types/entry-points'
+import { getEntryPoints } from '@/lib/services/entry-points-service'
 
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
@@ -20,6 +23,7 @@ export default function ReviewDetailPage() {
   const router = useRouter()
   const { webUser, user } = useAuth()
   const [survey, setSurvey] = useState<SurveyLocation | null>(null)
+  const [entryPoints, setEntryPoints] = useState<EntryPoint[]>([])
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -38,6 +42,12 @@ export default function ReviewDetailPage() {
 
         if (error) throw error
         setSurvey(data)
+
+        // Fetch entry points
+        if (data?.id) {
+          const entryPointsData = await getEntryPoints(data.id)
+          setEntryPoints(entryPointsData)
+        }
       } catch (error) {
         console.error('Error fetching survey:', error)
       } finally {
@@ -214,6 +224,21 @@ export default function ReviewDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Entry Points Section */}
+      {entryPoints.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LogIn className="h-5 w-5 text-green-600" />
+              Lối vào ({entryPoints.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EntryPointsSection entryPoints={entryPoints} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

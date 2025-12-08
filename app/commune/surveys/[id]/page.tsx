@@ -10,11 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { PhotoUpload } from '@/components/survey/photo-upload'
-import { ArrowLeft, Save, Send, Camera, MapPin, Search } from 'lucide-react'
+import { ArrowLeft, Save, Send, Camera, MapPin, Search, LogIn } from 'lucide-react'
 import Link from 'next/link'
 import nextDynamic from 'next/dynamic'
 import { Database } from '@/lib/types/database'
 import { toast } from 'sonner'
+import { EntryPointsSection } from '@/components/survey/entry-points-section'
+import { EntryPoint } from '@/lib/types/entry-points'
+import { getEntryPoints } from '@/lib/services/entry-points-service'
 
 const EnhancedSurveyMap = nextDynamic(
   () => import('@/components/map/enhanced-survey-map').then(mod => mod.EnhancedSurveyMap),
@@ -31,6 +34,7 @@ export default function SurveyDetailPage() {
   const router = useRouter()
   const { webUser, user } = useAuth()
   const [survey, setSurvey] = useState<SurveyLocation | null>(null)
+  const [entryPoints, setEntryPoints] = useState<EntryPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [parcelCode, setParcelCode] = useState('')
@@ -84,6 +88,14 @@ export default function SurveyDetailPage() {
         if (mounted) {
           console.log('Survey fetched successfully:', data)
           setSurvey(data)
+
+          // Fetch entry points for this survey
+          if (data?.id) {
+            const entryPointsData = await getEntryPoints(data.id)
+            if (mounted) {
+              setEntryPoints(entryPointsData)
+            }
+          }
         }
       } catch (error: any) {
         if (error.name === 'AbortError') {
@@ -479,6 +491,19 @@ export default function SurveyDetailPage() {
             maxPhotos={10}
             disabled={survey.status === 'published' || survey.status === 'approved_central'}
           />
+        </CardContent>
+      </Card>
+
+      {/* Entry Points Section */}
+      <Card className="shadow-lg border-2 border-green-100">
+        <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
+          <CardTitle className="flex items-center gap-2">
+            <LogIn className="h-5 w-5 text-green-600" />
+            Lối vào ({entryPoints.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <EntryPointsSection entryPoints={entryPoints} />
         </CardContent>
       </Card>
 

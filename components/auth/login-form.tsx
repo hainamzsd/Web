@@ -39,7 +39,7 @@ export function LoginForm() {
         router.refresh()
       }
     } catch {
-      setError('An unexpected error occurred')
+      setError('Đã xảy ra lỗi không mong muốn')
     } finally {
       setLoading(false)
     }
@@ -57,12 +57,12 @@ export function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">
-              Email
+              Địa chỉ Email
             </label>
             <input
               id="email"
               type="email"
-              placeholder="email@example.com"
+              placeholder="ten@donvi.gov.vn"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

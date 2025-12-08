@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, MapPin } from 'lucide-react'
+import { CheckCircle, MapPin, Eye } from 'lucide-react'
+import Link from 'next/link'
 import { Database } from '@/lib/types/database'
 import { toast } from 'sonner'
 
@@ -153,21 +154,29 @@ export function ApprovalsClient({ initialSurveys }: ApprovalsClientProps) {
                         <StatusBadge status={survey.status} />
                       </td>
                       <td className="py-3 px-4">
-                        <Button
-                          onClick={() => handleApprove(survey)}
-                          disabled={processing === survey.id}
-                          size="sm"
-                          className="gap-2 bg-green-600 hover:bg-green-700"
-                        >
-                          {processing === survey.id ? (
-                            <>Đang xử lý...</>
-                          ) : (
-                            <>
-                              <CheckCircle className="h-4 w-4" />
-                              Phê duyệt & Cấp mã
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/central/surveys/${survey.id}`}>
+                            <Button size="sm" variant="outline" className="gap-1">
+                              <Eye className="h-4 w-4" />
+                              Xem
+                            </Button>
+                          </Link>
+                          <Button
+                            onClick={() => handleApprove(survey)}
+                            disabled={processing === survey.id}
+                            size="sm"
+                            className="gap-1 bg-green-600 hover:bg-green-700"
+                          >
+                            {processing === survey.id ? (
+                              <>Đang xử lý...</>
+                            ) : (
+                              <>
+                                <CheckCircle className="h-4 w-4" />
+                                Duyệt & Cấp mã
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

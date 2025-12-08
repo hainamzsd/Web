@@ -1,70 +1,93 @@
 import Link from "next/link";
+import { MapPin, Users, Shield, BarChart3 } from "lucide-react";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-5xl w-full text-center">
-        <h1 className="text-5xl font-bold text-gray-900 mb-4">
-          C06 National Location Identification System
+    <main className="flex min-h-screen flex-col items-center justify-center p-8 md:p-24 bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="max-w-4xl w-full text-center">
+        {/* Government Header */}
+        {/* <div className="mb-8">
+          <p className="text-sm text-slate-500 tracking-wide mb-1">
+            CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+          </p>
+          <p className="text-xs text-slate-400 mb-6">
+            Độc lập - Tự do - Hạnh phúc
+          </p>
+          <div className="w-16 h-0.5 bg-red-600 mx-auto mb-8"></div>
+        </div> */}
+
+        {/* Main Title */}
+        <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4 tracking-tight">
+          Hệ thống Định danh Vị trí Quốc gia
         </h1>
-        <p className="text-xl text-gray-600 mb-12">
-          Vietnam&apos;s National Location Identification Platform
+        <p className="text-lg text-slate-500 mb-4">
+          Cục Cảnh sát Quản lý Hành chính về Trật tự Xã hội - C06
+        </p>
+        <p className="text-slate-400 mb-12 max-w-2xl mx-auto">
+          Nền tảng quản lý và chuẩn hóa thông tin địa điểm trên phạm vi toàn quốc
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+        {/* Role Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <Link
-            href="/commune"
-            className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100"
+            href="/login"
+            className="group bg-white rounded-xl border border-slate-200 p-6 transition-all hover:shadow-lg hover:border-blue-300 hover:-translate-y-1"
           >
-            <h2 className="mb-3 text-2xl font-semibold">
-              Commune Officer{" "}
-              <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-                &rarr;
-              </span>
+            <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center mb-4 mx-auto group-hover:bg-blue-100 transition-colors">
+              <MapPin className="w-6 h-6 text-blue-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">
+              Cán bộ Xã/Phường
             </h2>
-            <p className="m-0 max-w-[30ch] text-sm opacity-50">
-              Review and process survey submissions from mobile app
+            <p className="text-sm text-slate-500">
+              Tiếp nhận và xử lý phiếu khảo sát từ ứng dụng di động
             </p>
           </Link>
 
           <Link
-            href="/supervisor"
-            className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100"
+            href="/login"
+            className="group bg-white rounded-xl border border-slate-200 p-6 transition-all hover:shadow-lg hover:border-orange-300 hover:-translate-y-1"
           >
-            <h2 className="mb-3 text-2xl font-semibold">
-              Supervisor{" "}
-              <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-                &rarr;
-              </span>
+            <div className="w-12 h-12 bg-orange-50 rounded-lg flex items-center justify-center mb-4 mx-auto group-hover:bg-orange-100 transition-colors">
+              <Shield className="w-6 h-6 text-orange-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">
+              Giám sát viên
             </h2>
-            <p className="m-0 max-w-[30ch] text-sm opacity-50">
-              Review and approve submissions from commune officers
+            <p className="text-sm text-slate-500">
+              Kiểm tra và phê duyệt đề xuất từ cán bộ cấp xã/phường
             </p>
           </Link>
 
           <Link
-            href="/central"
-            className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100"
+            href="/login"
+            className="group bg-white rounded-xl border border-slate-200 p-6 transition-all hover:shadow-lg hover:border-red-300 hover:-translate-y-1"
           >
-            <h2 className="mb-3 text-2xl font-semibold">
-              Central Admin{" "}
-              <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-                &rarr;
-              </span>
+            <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center mb-4 mx-auto group-hover:bg-red-100 transition-colors">
+              <BarChart3 className="w-6 h-6 text-red-600" />
+            </div>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">
+              Quản trị Trung ương
             </h2>
-            <p className="m-0 max-w-[30ch] text-sm opacity-50">
-              Nationwide oversight, ID generation, and analytics
+            <p className="text-sm text-slate-500">
+              Quản lý toàn quốc, cấp mã định danh và thống kê báo cáo
             </p>
           </Link>
         </div>
 
-        <div className="mt-12">
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8"
-          >
-            Login to System
-          </Link>
+        {/* Login Button */}
+        <Link
+          href="/login"
+          className="inline-flex items-center justify-center bg-red-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors shadow-sm"
+        >
+          Đăng nhập hệ thống
+        </Link>
+
+        {/* Footer */}
+        <div className="mt-16 pt-8 border-t border-slate-200">
+          <p className="text-xs text-slate-400">
+            © 2024 Bộ Công an Việt Nam. Bản quyền được bảo lưu.
+          </p>
         </div>
       </div>
     </main>

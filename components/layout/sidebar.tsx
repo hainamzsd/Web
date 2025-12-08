@@ -41,6 +41,7 @@ const roleNavItems: Record<string, NavItem[]> = {
   ],
   central_admin: [
     { title: 'Dashboard', href: '/central/dashboard', icon: LayoutDashboard },
+    { title: 'Khảo sát', href: '/central/surveys', icon: FileText },
     { title: 'Bản đồ QG', href: '/central/national-map', icon: Map },
     { title: 'Vị trí', href: '/central/locations', icon: MapPin },
     { title: 'Phê duyệt', href: '/central/approvals', icon: CheckSquare },
@@ -50,6 +51,7 @@ const roleNavItems: Record<string, NavItem[]> = {
   ],
   system_admin: [
     { title: 'Dashboard', href: '/central/dashboard', icon: LayoutDashboard },
+    { title: 'Khảo sát', href: '/central/surveys', icon: FileText },
     { title: 'Bản đồ QG', href: '/central/national-map', icon: Map },
     { title: 'Vị trí', href: '/central/locations', icon: MapPin },
     { title: 'Phê duyệt', href: '/central/approvals', icon: CheckSquare },

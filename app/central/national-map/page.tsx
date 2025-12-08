@@ -30,7 +30,7 @@ interface ProvinceStat {
 }
 
 export default function NationalMapPage() {
-  const { webUser, loading: authLoading } = useAuth()
+  const { webUser } = useAuth()
   const [surveys, setSurveys] = useState<SurveyLocation[]>([])
   const [provinceStats, setProvinceStats] = useState<ProvinceStat[]>([])
   const [selectedProvince, setSelectedProvince] = useState<string>('')
@@ -41,9 +41,6 @@ export default function NationalMapPage() {
 
   useEffect(() => {
     async function fetchData() {
-      // Wait for auth to finish loading
-      if (authLoading) return
-
       if (!webUser) {
         setLoading(false)
         return
@@ -84,7 +81,7 @@ export default function NationalMapPage() {
 
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webUser, authLoading, selectedProvince, selectedDistrict, selectedCommune])
+  }, [webUser, selectedProvince, selectedDistrict, selectedCommune])
 
   const calculateProvinceStats = (surveys: SurveyLocation[]): ProvinceStat[] => {
     const statsByProvince: Record<string, ProvinceStat> = {}
