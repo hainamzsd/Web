@@ -54,15 +54,6 @@ export default function CentralSurveyDetailPage() {
         return
       }
 
-      const timeoutId = setTimeout(() => {
-        if (mounted && loading) {
-          toast.error("Lỗi tải dữ liệu", {
-            description: "Thời gian chờ quá lâu, vui lòng thử lại sau.",
-          })
-          setLoading(false)
-          abortController.abort()
-        }
-      }, 15000)
 
       try {
         // Fetch survey
@@ -91,8 +82,6 @@ export default function CentralSurveyDetailPage() {
           console.error('Error fetching approval history:', historyError)
         }
 
-        clearTimeout(timeoutId)
-
         if (mounted) {
           setSurvey(surveyData)
           setApprovalHistory(historyData || [])
@@ -118,7 +107,6 @@ export default function CentralSurveyDetailPage() {
         if (mounted) {
           setLoading(false)
         }
-        clearTimeout(timeoutId)
       }
     }
 

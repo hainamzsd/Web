@@ -8,11 +8,25 @@ import { useAuth } from '@/lib/auth/auth-context'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AdminSelector } from '@/components/map/admin-selector'
-import { Database } from '@/lib/types/database'
-import { getProvinceByCode } from '@/lib/map/vietnam-administrative-data'
 import { MapPin, BarChart3, TrendingUp } from 'lucide-react'
 
-type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
+interface SurveyWithLocation {
+  id: string
+  latitude: number | null
+  longitude: number | null
+  location_name: string | null
+  status: string
+  polygon_geometry: any
+  address: string | null
+  owner_name: string | null
+  land_area_m2: number | null
+  province_id: number | null
+  province_name: string | null
+  ward_id: number | null
+  ward_name: string | null
+  created_at: string
+  location_identifier: string | null
+}
 
 // Dynamic import for map to avoid SSR issues
 const VietnamAdminMap = dynamic(
@@ -31,7 +45,7 @@ interface ProvinceStat {
 
 export default function NationalMapPage() {
   const { webUser } = useAuth()
-  const [surveys, setSurveys] = useState<SurveyLocation[]>([])
+  const [surveys, setSurveys] = useState<SurveyWithLocation[]>([])
   const [provinceStats, setProvinceStats] = useState<ProvinceStat[]>([])
   const [selectedProvince, setSelectedProvince] = useState<string>('')
   const [selectedDistrict, setSelectedDistrict] = useState<string>('')
@@ -47,21 +61,22 @@ export default function NationalMapPage() {
       }
 
       try {
-        // Fetch all surveys
+        // Fetch all surveys with province/ward names via join
         let query = supabase
           .from('survey_locations')
-          .select('*')
+          .select(`
+            *,
+            province:provinces!survey_locations_province_id_fkey(name),
+            ward:wards!survey_locations_ward_id_fkey(name)
+          `)
           .order('created_at', { ascending: false })
 
-        // Apply filters if selected
+        // Apply filters using INTEGER IDs
         if (selectedProvince) {
-          query = query.eq('province_code', selectedProvince)
-        }
-        if (selectedDistrict) {
-          query = query.eq('district_code', selectedDistrict)
+          query = query.eq('province_id', parseInt(selectedProvince))
         }
         if (selectedCommune) {
-          query = query.eq('ward_code', selectedCommune)
+          query = query.eq('ward_id', parseInt(selectedCommune))
         }
 
         const { data, error } = await query
@@ -83,16 +98,17 @@ export default function NationalMapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [webUser, selectedProvince, selectedDistrict, selectedCommune])
 
-  const calculateProvinceStats = (surveys: SurveyLocation[]): ProvinceStat[] => {
+  const calculateProvinceStats = (surveys: any[]): ProvinceStat[] => {
     const statsByProvince: Record<string, ProvinceStat> = {}
 
     surveys.forEach(survey => {
-      const code = survey.province_code || 'unknown'
-      if (!statsByProvince[code]) {
-        const province = getProvinceByCode(code)
-        statsByProvince[code] = {
-          province_code: code,
-          province_name: province?.name || 'Unknown',
+      const provinceId = survey.province_id?.toString() || 'unknown'
+      if (!statsByProvince[provinceId]) {
+        // Get province name from the joined data
+        const provinceName = survey.province?.name || `Tỉnh ${provinceId}`
+        statsByProvince[provinceId] = {
+          province_code: provinceId,
+          province_name: provinceName,
           total: 0,
           pending: 0,
           approved: 0,
@@ -100,12 +116,12 @@ export default function NationalMapPage() {
         }
       }
 
-      statsByProvince[code].total++
-      if (survey.status === 'pending') statsByProvince[code].pending++
-      if (survey.status === 'approved_central' || survey.status === 'approved_commune') {
-        statsByProvince[code].approved++
+      statsByProvince[provinceId].total++
+      if (survey.status === 'pending' || survey.status === 'reviewed') statsByProvince[provinceId].pending++
+      if (survey.status === 'approved_central' || survey.status === 'approved_commune' || survey.status === 'published') {
+        statsByProvince[provinceId].approved++
       }
-      if (survey.status === 'rejected') statsByProvince[code].rejected++
+      if (survey.status === 'rejected') statsByProvince[provinceId].rejected++
     })
 
     return Object.values(statsByProvince).sort((a, b) => b.total - a.total)
@@ -218,17 +234,19 @@ export default function NationalMapPage() {
               <div className="h-[600px] rounded-lg overflow-hidden">
                 <VietnamAdminMap
                   showSurveys={true}
-                  surveys={surveys.map(s => ({
-                    id: s.id,
-                    latitude: s.latitude,
-                    longitude: s.longitude,
-                    location_name: s.location_name || 'Unknown',
-                    status: s.status,
-                    polygon_geometry: s.polygon_geometry,
-                    address: s.address || undefined,
-                    owner_name: s.owner_name || undefined,
-                    land_area_m2: s.land_area_m2
-                  }))}
+                  surveys={surveys
+                    .filter(s => s.latitude != null && s.longitude != null)
+                    .map(s => ({
+                      id: s.id,
+                      latitude: s.latitude!,
+                      longitude: s.longitude!,
+                      location_name: s.location_name || 'Unknown',
+                      status: s.status,
+                      polygon_geometry: s.polygon_geometry,
+                      address: s.address || undefined,
+                      owner_name: s.owner_name || undefined,
+                      land_area_m2: s.land_area_m2 ?? undefined
+                    }))}
                 />
               </div>
             </CardContent>

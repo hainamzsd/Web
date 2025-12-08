@@ -54,17 +54,6 @@ export default function SurveyDetailPage() {
 
       console.log('Fetching survey with ID:', params.id)
 
-      // Set a timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
-        if (mounted && loading) {
-          console.error('Survey fetch timed out')
-          toast.error("Lỗi tải dữ liệu", {
-            description: "Thời gian chờ quá lâu, vui lòng thử lại sau.",
-          })
-          setLoading(false)
-          abortController.abort()
-        }
-      }, 10000) // 10 seconds timeout
 
       try {
         const { data, error } = await supabase
@@ -74,7 +63,6 @@ export default function SurveyDetailPage() {
           .abortSignal(abortController.signal)
           .single()
 
-        clearTimeout(timeoutId)
 
         if (error) {
           if (error.code === 'PGRST116') {
@@ -112,7 +100,6 @@ export default function SurveyDetailPage() {
         if (mounted) {
           setLoading(false)
         }
-        clearTimeout(timeoutId)
       }
     }
 

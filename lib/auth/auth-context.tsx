@@ -5,7 +5,14 @@ import { User, Session } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/lib/types/database'
 
-type WebUser = Database['public']['Tables']['web_users']['Row']
+type WebUser = Database['public']['Tables']['web_users']['Row'] & {
+  profile?: {
+    full_name: string | null
+    avatar_url: string | null
+    unit: string | null
+    police_id: string | null
+  }
+}
 
 interface AuthContextType {
   user: User | null
@@ -18,51 +25,114 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const supabase = createClient()
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [webUser, setWebUser] = useState<WebUser | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchWebUser = useCallback(async (userId: string): Promise<WebUser | null> => {
-    const { data } = await supabase
-      .from('web_users')
-      .select('*')
-      .eq('profile_id', userId)
-      .single()
-    return data
-  }, [])
-
+  // Initialize auth on mount
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
-      setSession(s)
-      setUser(s?.user ?? null)
-      if (s?.user) {
-        const wu = await fetchWebUser(s.user.id)
-        setWebUser(wu)
-      }
-      setLoading(false)
-    })
+    const supabase = createClient()
+    let isMounted = true
 
+    // Force loading to false after 3 seconds no matter what
+    const forceTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('[Auth] Force timeout - stopping loading')
+        setLoading(false)
+      }
+    }, 3000)
+
+    const init = async () => {
+      try {
+        // Get current session
+        const { data: { session: currentSession } } = await supabase.auth.getSession()
+
+        if (!isMounted) return
+
+        if (currentSession?.user) {
+          setSession(currentSession)
+          setUser(currentSession.user)
+
+          // Try to fetch web user (don't block on this)
+          const { data: wu } = await supabase
+            .from('web_users')
+            .select(`
+              *,
+              profile:profiles (
+                full_name,
+                avatar_url,
+                unit,
+                police_id
+              )
+            `)
+            .eq('profile_id', currentSession.user.id)
+            .single()
+
+          if (isMounted && wu) {
+            setWebUser(wu)
+          }
+        }
+      } catch (err) {
+        console.error('[Auth] Init error:', err)
+      } finally {
+        if (isMounted) {
+          clearTimeout(forceTimeout)
+          setLoading(false)
+        }
+      }
+    }
+
+    init()
+
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, s) => {
-        setSession(s)
-        setUser(s?.user ?? null)
-        if (s?.user) {
-          const wu = await fetchWebUser(s.user.id)
-          setWebUser(wu)
+      async (event, newSession) => {
+        if (!isMounted) return
+
+        // Ignore INITIAL_SESSION - we handle that above
+        if (event === 'INITIAL_SESSION') return
+
+        console.log('[Auth] State changed:', event)
+
+        setSession(newSession)
+        setUser(newSession?.user ?? null)
+
+        if (newSession?.user) {
+          const { data: wu } = await supabase
+            .from('web_users')
+            .select(`
+              *,
+              profile:profiles (
+                full_name,
+                avatar_url,
+                unit,
+                police_id
+              )
+            `)
+            .eq('profile_id', newSession.user.id)
+            .single()
+
+          if (isMounted) {
+            setWebUser(wu)
+          }
         } else {
           setWebUser(null)
         }
       }
     )
 
-    return () => subscription.unsubscribe()
-  }, [fetchWebUser])
+    return () => {
+      isMounted = false
+      clearTimeout(forceTimeout)
+      subscription.unsubscribe()
+    }
+  }, [])
 
   const signIn = useCallback(async (email: string, password: string) => {
+    const supabase = createClient()
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error || !data.user) {
@@ -71,7 +141,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: wu, error: wuError } = await supabase
       .from('web_users')
-      .select('*')
+      .select(`
+        *,
+        profile:profiles (
+          full_name,
+          avatar_url,
+          unit,
+          police_id
+        )
+      `)
       .eq('profile_id', data.user.id)
       .single()
 
@@ -87,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    const supabase = createClient()
     await supabase.auth.signOut()
     setUser(null)
     setSession(null)

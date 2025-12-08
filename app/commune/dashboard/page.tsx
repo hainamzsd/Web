@@ -29,16 +29,30 @@ export default function CommuneDashboardPage() {
       // Wait for auth to finish loading
       if (authLoading) return
 
-      if (!webUser || !webUser.ward_id) {
+      // If no webUser, stop loading
+      if (!webUser) {
         setDataLoading(false)
         return
       }
 
-      const { data } = await supabase
+      let query = supabase
         .from('survey_locations')
         .select('*')
-        .eq('ward_id', webUser.ward_id)
         .order('created_at', { ascending: false })
+
+      if (webUser.ward_id) {
+        query = query.eq('ward_id', webUser.ward_id)
+      } else if (webUser.province_id) {
+        query = query.eq('province_id', webUser.province_id)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Error fetching surveys:', error)
+        setDataLoading(false)
+        return
+      }
 
       if (!data) {
         setDataLoading(false)
@@ -62,7 +76,7 @@ export default function CommuneDashboardPage() {
       }, { pending: 0, reviewed: 0, approved: 0, rejected: 0, total: 0, thisWeek: 0, lastWeek: 0 })
 
       setStats(counts)
-      setRecentSurveys(data.slice(0, 5))
+      setRecentSurveys(data.slice(0, 5) as any)
       setStatusData([
         { name: 'Chờ xử lý', surveys: counts.pending },
         { name: 'Đã xem xét', surveys: counts.reviewed },

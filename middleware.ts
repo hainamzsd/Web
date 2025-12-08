@@ -78,34 +78,53 @@ export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname === '/login' && user) {
     // Fetch user role to redirect to appropriate dashboard
     // Add timeout to prevent hanging if DB is slow
-    const fetchWebUserPromise = supabase
-      .from('web_users')
-      .select('role')
-      .eq('profile_id', user.id)
-      .single()
+    try {
+      const fetchWebUserPromise = supabase
+        .from('web_users')
+        .select('role')
+        .eq('profile_id', user.id)
+        .single()
 
-    const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) => {
-      setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 5000)
-    })
-
-    const { data: webUser } = await Promise.race([fetchWebUserPromise, timeoutPromise]) as any
-
-    if (webUser) {
-      const roleRoutes: Record<string, string> = {
-        commune_officer: '/commune/dashboard',
-        commune_supervisor: '/supervisor/dashboard',
-        central_admin: '/central/dashboard',
-        system_admin: '/central/dashboard',
-      }
-      const targetUrl = new URL(roleRoutes[webUser.role] || '/commune/dashboard', request.url)
-      const redirectResponse = NextResponse.redirect(targetUrl)
-
-      // Copy cookies from the response object
-      response.cookies.getAll().forEach((cookie) => {
-        redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+      const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) => {
+        setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), 3000)
       })
 
-      return redirectResponse
+      const { data: webUser, error } = await Promise.race([fetchWebUserPromise, timeoutPromise]) as any
+
+      if (error) {
+        console.error('[Middleware] Error fetching web_user:', error)
+      }
+
+      if (webUser?.role) {
+        const roleRoutes: Record<string, string> = {
+          commune_officer: '/commune/dashboard',
+          commune_supervisor: '/supervisor/dashboard',
+          central_admin: '/central/dashboard',
+          system_admin: '/central/dashboard',
+        }
+        const targetUrl = new URL(roleRoutes[webUser.role] || '/commune/dashboard', request.url)
+        const redirectResponse = NextResponse.redirect(targetUrl)
+
+        // Copy cookies from the response object
+        response.cookies.getAll().forEach((cookie) => {
+          redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+        })
+
+        return redirectResponse
+      } else {
+        // No web_user found - redirect to commune dashboard as default
+        const targetUrl = new URL('/commune/dashboard', request.url)
+        const redirectResponse = NextResponse.redirect(targetUrl)
+        response.cookies.getAll().forEach((cookie) => {
+          redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+        })
+        return redirectResponse
+      }
+    } catch (err) {
+      console.error('[Middleware] Exception fetching web_user:', err)
+      // On error, redirect to commune dashboard as fallback
+      const targetUrl = new URL('/commune/dashboard', request.url)
+      return NextResponse.redirect(targetUrl)
     }
   }
 

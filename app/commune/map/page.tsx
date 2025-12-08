@@ -21,19 +21,27 @@ export default function CommuneMapPage() {
       // Wait for auth to finish loading
       if (authLoading) return
 
-      if (!webUser || !webUser.ward_id) {
+      if (!webUser) {
         setDataLoading(false)
         return
       }
 
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('survey_locations')
           .select('*')
-          .eq('ward_id', webUser.ward_id)
+
+        // Filter by ward_id or province_id based on what's available
+        if (webUser.ward_id) {
+          query = query.eq('ward_id', webUser.ward_id)
+        } else if (webUser.province_id) {
+          query = query.eq('province_id', webUser.province_id)
+        }
+
+        const { data, error } = await query
 
         if (error) throw error
-        setSurveys(data || [])
+        setSurveys((data || []) as any)
       } catch (error) {
         console.error('Error fetching surveys:', error)
       } finally {
