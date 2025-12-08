@@ -250,9 +250,9 @@ export function ProcessClient({ initialSurveys, initialStats }: ProcessClientPro
     // Dynamically import leaflet only on client side
     import('leaflet').then((L) => {
       setMarkerIcon(new L.Icon({
-        iconUrl: '/leaflet/marker-icon.png',
-        iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-        shadowUrl: '/leaflet/marker-shadow.png',
+        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         iconSize: [25, 41],
         iconAnchor: [12, 41],
         popupAnchor: [1, -34],

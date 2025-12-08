@@ -25,18 +25,6 @@ function MapController({
   const map = useMap()
 
   useEffect(() => {
-    // Fix marker icons - do this inside useEffect
-    const fixMarkerIcons = async () => {
-      const L = await import('leaflet')
-      delete (L.default.Icon.Default.prototype as any)._getIconUrl
-      L.default.Icon.Default.mergeOptions({
-        iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-        iconUrl: '/leaflet/marker-icon.png',
-        shadowUrl: '/leaflet/marker-shadow.png',
-      })
-    }
-    fixMarkerIcons()
-
     // Store map instance in ref for cleanup
     mapInstanceRef.current = map
 

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Database } from '@/lib/types/database'
-import { EntryPoint, EntryPointType, ENTRY_TYPE_LABELS } from '@/lib/types/entry-points'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet-draw/dist/leaflet.draw.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
@@ -13,7 +12,6 @@ type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
 interface EnhancedSurveyMapProps {
   surveys: SurveyLocation[]
-  entryPoints?: Record<string, EntryPoint[]>
   center?: [number, number]
   zoom?: number
   showHeatmap?: boolean
@@ -24,20 +22,8 @@ interface EnhancedSurveyMapProps {
   onSurveySelect?: (survey: SurveyLocation | null) => void
 }
 
-// SVG icons for entry point types
-const ENTRY_POINT_ICONS: Record<EntryPointType, string> = {
-  main_gate: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 19V5c0-1.1-.9-2-2-2H7c-1.1 0-2 .9-2 2v14H3v2h18v-2h-2zm-6 0h-2v-6h2v6zm4-10H7V7h10v2z"/></svg>`,
-  side_gate: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 4H6v2h12V4zm1 7H5c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zm-1 6H6v-4h12v4z"/></svg>`,
-  service_entrance: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`,
-  emergency_exit: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>`,
-  pedestrian: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>`,
-  vehicle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>`,
-  other: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>`,
-}
-
 function EnhancedSurveyMapComponent({
   surveys,
-  entryPoints = {},
   center = [16.0, 108.0],
   zoom = 6,
   showHeatmap = false,
@@ -54,7 +40,6 @@ function EnhancedSurveyMapComponent({
   const drawControlRef = useRef<any>(null)
   const drawnItemsRef = useRef<any>(null)
   const polygonLayerRef = useRef<any>(null)
-  const entryPointsLayerRef = useRef<any>(null)
   const [mapMode, setMapMode] = useState<'markers' | 'heatmap' | 'clusters'>('markers')
   const [mapId] = useState(`enhanced-map-${Math.random().toString(36).substr(2, 9)}`)
   const [isMapReady, setIsMapReady] = useState(false)
@@ -149,14 +134,6 @@ function EnhancedSurveyMapComponent({
       if (!mounted) return
 
       leafletRef.current = L.default || L
-
-      // Fix marker icons
-      delete (leafletRef.current.Icon.Default.prototype as any)._getIconUrl
-      leafletRef.current.Icon.Default.mergeOptions({
-        iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-        iconUrl: '/leaflet/marker-icon.png',
-        shadowUrl: '/leaflet/marker-shadow.png',
-      })
 
       const mapElement = document.getElementById(mapId)
       if (!mapElement || mapRef.current) return
@@ -441,129 +418,6 @@ function EnhancedSurveyMapComponent({
     updateMarkers()
   }, [surveys, mapMode, showHeatmap, showClustering, selectedSurveyId, isMapReady])
 
-  // Render entry points
-  useEffect(() => {
-    if (!mapRef.current || !leafletRef.current || !isMapReady) return
-
-    const L = leafletRef.current
-
-    // Clear existing entry points layer
-    if (entryPointsLayerRef.current) {
-      entryPointsLayerRef.current.remove()
-      entryPointsLayerRef.current = null
-    }
-
-    // Get all entry points from the entryPoints object
-    const allEntryPoints = Object.entries(entryPoints).flatMap(([surveyId, eps]) =>
-      eps.map(ep => ({ ...ep, surveyId }))
-    )
-
-    if (allEntryPoints.length === 0) return
-
-    const entryPointsLayer = L.layerGroup()
-
-    allEntryPoints.forEach(ep => {
-      const isPrimary = ep.isPrimary
-      const bgColor = isPrimary ? '#16a34a' : '#22c55e' // green-600 vs green-500
-      const borderColor = isPrimary ? '#15803d' : '#16a34a'
-      const size = isPrimary ? 32 : 26
-
-      const iconSvg = ENTRY_POINT_ICONS[ep.entryType] || ENTRY_POINT_ICONS.other
-      const typeLabel = ENTRY_TYPE_LABELS[ep.entryType] || 'Khác'
-
-      const icon = L.divIcon({
-        className: 'entry-point-marker',
-        html: `
-          <div style="
-            background-color: ${bgColor};
-            width: ${size}px;
-            height: ${size}px;
-            border-radius: 6px;
-            border: 2px solid ${borderColor};
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            position: relative;
-          ">
-            <div style="width: ${size * 0.55}px; height: ${size * 0.55}px;">
-              ${iconSvg}
-            </div>
-            ${isPrimary ? `
-              <div style="
-                position: absolute;
-                top: -6px;
-                right: -6px;
-                width: 14px;
-                height: 14px;
-                background: #fbbf24;
-                border-radius: 50%;
-                border: 2px solid white;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 8px;
-                color: #92400e;
-              ">★</div>
-            ` : ''}
-          </div>
-        `,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-      })
-
-      const marker = L.marker([ep.latitude, ep.longitude], { icon })
-
-      // Find survey name for popup
-      const survey = surveys.find(s => s.id === ep.surveyId)
-      const surveyName = survey?.location_name || 'Không rõ'
-
-      marker.bindPopup(`
-        <div style="min-width: 180px;">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
-            <div style="
-              background-color: ${bgColor};
-              width: 24px;
-              height: 24px;
-              border-radius: 4px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: white;
-            ">
-              <div style="width: 14px; height: 14px;">${iconSvg}</div>
-            </div>
-            <div>
-              <div style="font-weight: bold; color: ${bgColor}; font-size: 13px;">
-                ${typeLabel}
-                ${isPrimary ? '<span style="color: #f59e0b; font-size: 11px;"> ★ Chính</span>' : ''}
-              </div>
-              <div style="font-size: 10px; color: #666;">Lối vào #${ep.sequenceNumber}</div>
-            </div>
-          </div>
-          <div style="font-size: 11px; color: #333; margin-bottom: 4px;">
-            <strong>Khảo sát:</strong> ${surveyName}
-          </div>
-          ${ep.houseNumber || ep.street ? `
-            <div style="font-size: 11px; color: #666; margin-bottom: 4px;">
-              ${[ep.houseNumber, ep.street].filter(Boolean).join(', ')}
-            </div>
-          ` : ''}
-          <div style="font-size: 10px; color: #999;">
-            ${ep.latitude.toFixed(6)}, ${ep.longitude.toFixed(6)}
-          </div>
-          ${ep.notes ? `<div style="font-size: 10px; color: #666; margin-top: 4px; padding-top: 4px; border-top: 1px solid #eee;">${ep.notes}</div>` : ''}
-        </div>
-      `)
-
-      entryPointsLayer.addLayer(marker)
-    })
-
-    entryPointsLayer.addTo(mapRef.current)
-    entryPointsLayerRef.current = entryPointsLayer
-  }, [entryPoints, surveys, isMapReady])
-
   return (
     <div className="relative">
       <div id={mapId} className="w-full h-[600px] rounded-lg shadow-lg border-2 border-gray-200 z-0"></div>
@@ -602,7 +456,7 @@ function EnhancedSurveyMapComponent({
       {/* Legend */}
       <div className="absolute bottom-4 left-4 z-[1000] bg-white rounded-lg shadow-lg p-3 max-h-[300px] overflow-y-auto">
         <h4 className="font-semibold text-sm mb-2">Trạng thái khảo sát</h4>
-        <div className="space-y-1 text-xs mb-3">
+        <div className="space-y-1 text-xs">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-amber-500"></div>
             <span>Chờ xử lý</span>
@@ -628,26 +482,6 @@ function EnhancedSurveyMapComponent({
             <span>Từ chối</span>
           </div>
         </div>
-
-        {Object.keys(entryPoints).length > 0 && (
-          <>
-            <div className="border-t pt-2 mt-2">
-              <h4 className="font-semibold text-sm mb-2">Lối vào</h4>
-              <div className="space-y-1 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-green-600 flex items-center justify-center">
-                    <span className="text-white text-[8px]">★</span>
-                  </div>
-                  <span>Lối vào chính</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-green-500"></div>
-                  <span>Lối vào phụ</span>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
       </div>
     </div>
   )

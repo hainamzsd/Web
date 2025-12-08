@@ -31,54 +31,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Helper to clear auth state
+  const clearAuth = useCallback(() => {
+    setUser(null)
+    setSession(null)
+    setWebUser(null)
+  }, [])
+
+  // Helper to fetch web user
+  const fetchWebUser = useCallback(async (supabase: ReturnType<typeof createClient>, userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('web_users')
+        .select(`
+          *,
+          profile:profiles (
+            full_name,
+            avatar_url,
+            unit,
+            police_id
+          )
+        `)
+        .eq('profile_id', userId)
+        .single()
+
+      if (error) return null
+      return data
+    } catch {
+      return null
+    }
+  }, [])
+
   // Initialize auth on mount
   useEffect(() => {
     const supabase = createClient()
     let isMounted = true
 
-    // Force loading to false after 3 seconds no matter what
-    const forceTimeout = setTimeout(() => {
-      if (isMounted && loading) {
-        console.warn('[Auth] Force timeout - stopping loading')
-        setLoading(false)
-      }
-    }, 3000)
-
     const init = async () => {
       try {
-        // Get current session
+        // Race between getUser and a timeout to prevent infinite loading
+        const userPromise = supabase.auth.getUser()
+        const timeoutPromise = new Promise<{ data: { user: null }, error: Error }>((resolve) => {
+          setTimeout(() => resolve({ data: { user: null }, error: new Error('Auth timeout') }), 8000)
+        })
+
+        const { data: { user: validUser }, error } = await Promise.race([userPromise, timeoutPromise])
+
+        if (!isMounted) return
+
+        // If there's an auth error, timeout, or no user - clear and sign out
+        if (error || !validUser) {
+          // Sign out to clear any bad tokens
+          await supabase.auth.signOut().catch(() => { })
+          clearAuth()
+          setLoading(false)
+          return
+        }
+
+        // Get the session for the valid user
         const { data: { session: currentSession } } = await supabase.auth.getSession()
 
         if (!isMounted) return
 
-        if (currentSession?.user) {
-          setSession(currentSession)
-          setUser(currentSession.user)
+        setUser(validUser)
+        setSession(currentSession)
 
-          // Try to fetch web user (don't block on this)
-          const { data: wu } = await supabase
-            .from('web_users')
-            .select(`
-              *,
-              profile:profiles (
-                full_name,
-                avatar_url,
-                unit,
-                police_id
-              )
-            `)
-            .eq('profile_id', currentSession.user.id)
-            .single()
-
-          if (isMounted && wu) {
-            setWebUser(wu)
-          }
+        // Fetch web user data
+        const wu = await fetchWebUser(supabase, validUser.id)
+        if (isMounted && wu) {
+          setWebUser(wu)
         }
-      } catch (err) {
-        console.error('[Auth] Init error:', err)
+      } catch {
+        if (isMounted) {
+          // Sign out to clear any bad tokens
+          await supabase.auth.signOut().catch(() => { })
+          clearAuth()
+        }
       } finally {
         if (isMounted) {
-          clearTimeout(forceTimeout)
           setLoading(false)
         }
       }
@@ -90,30 +120,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         if (!isMounted) return
-
-        // Ignore INITIAL_SESSION - we handle that above
         if (event === 'INITIAL_SESSION') return
 
-        console.log('[Auth] State changed:', event)
+        // Handle token refresh failure - clear auth and redirect
+        if (event === 'TOKEN_REFRESHED' && !newSession) {
+          clearAuth()
+          return
+        }
+
+        // Handle sign out
+        if (event === 'SIGNED_OUT') {
+          clearAuth()
+          return
+        }
 
         setSession(newSession)
         setUser(newSession?.user ?? null)
 
         if (newSession?.user) {
-          const { data: wu } = await supabase
-            .from('web_users')
-            .select(`
-              *,
-              profile:profiles (
-                full_name,
-                avatar_url,
-                unit,
-                police_id
-              )
-            `)
-            .eq('profile_id', newSession.user.id)
-            .single()
-
+          const wu = await fetchWebUser(supabase, newSession.user.id)
           if (isMounted) {
             setWebUser(wu)
           }
@@ -125,10 +150,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       isMounted = false
-      clearTimeout(forceTimeout)
       subscription.unsubscribe()
     }
-  }, [])
+  }, [clearAuth, fetchWebUser])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const supabase = createClient()
