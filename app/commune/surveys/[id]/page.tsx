@@ -13,15 +13,26 @@ import { PhotoUpload } from '@/components/survey/photo-upload'
 import {
   ArrowLeft, Save, Send, Camera, MapPin, Search, LogIn, User, Clock,
   Navigation, Ruler, Building, FileText, History, Smartphone, Calendar,
-  Target, Layers, Home, Phone, CreditCard, MapPinned
+  Target, Layers, Home, Phone, CreditCard, MapPinned, Users, TreePine,
+  FileCheck, Link as LinkIcon, Unlink, AlertCircle, CheckCircle2
 } from 'lucide-react'
 import Link from 'next/link'
 import nextDynamic from 'next/dynamic'
-import { Database } from '@/lib/types/database'
+import { Database, LandParcelWithDetails, LandCertificate } from '@/lib/types/database'
 import { toast } from 'sonner'
 import { EntryPointsSection } from '@/components/survey/entry-points-section'
 import { EntryPoint } from '@/lib/types/entry-points'
 import { getEntryPoints } from '@/lib/services/entry-points-service'
+import {
+  lookupCertificate,
+  searchCertificates,
+  saveCertificateToDatabase,
+  getParcelWithDetails,
+  linkSurveyToParcel,
+  unlinkSurveyFromParcel,
+  getAvailableCertificateNumbers,
+  LAND_USE_TYPES
+} from '@/lib/services/certificate-service'
 
 const EnhancedSurveyMap = nextDynamic(
   () => import('@/components/map/enhanced-survey-map').then(mod => mod.EnhancedSurveyMap),
@@ -62,10 +73,13 @@ export default function SurveyDetailPage() {
   const [entryPoints, setEntryPoints] = useState<EntryPoint[]>([])
   const [dataLoading, setDataLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [parcelCode, setParcelCode] = useState('')
-  const [parcelSearchLoading, setParcelSearchLoading] = useState(false)
+  const [certificateNumber, setCertificateNumber] = useState('')
+  const [certificateSearchLoading, setCertificateSearchLoading] = useState(false)
+  const [linkedParcel, setLinkedParcel] = useState<LandParcelWithDetails | null>(null)
+  const [parcelLinking, setParcelLinking] = useState(false)
   const [activeTab, setActiveTab] = useState<'info' | 'location' | 'media' | 'history'>('info')
   const supabase = createClient()
+  const availableCertificates = getAvailableCertificateNumbers()
 
   useEffect(() => {
     if (authLoading) return
@@ -124,6 +138,14 @@ export default function SurveyDetailPage() {
           if (mounted) {
             setEntryPoints(entryPointsData)
           }
+
+          // Fetch linked parcel if exists
+          if (data.land_parcel_id) {
+            const parcelData = await getParcelWithDetails(data.land_parcel_id)
+            if (mounted && parcelData) {
+              setLinkedParcel(parcelData)
+            }
+          }
         }
       } catch (error) {
         console.error('fetchSurvey error:', error)
@@ -146,40 +168,93 @@ export default function SurveyDetailPage() {
     }
   }, [params?.id, authLoading])
 
-  const handleParcelSearch = async () => {
-    if (!parcelCode || !survey) return
-    setParcelSearchLoading(true)
+  const handleCertificateSearch = async () => {
+    if (!certificateNumber || !survey || !user) return
+    setCertificateSearchLoading(true)
 
     try {
-      const { data, error } = await supabase
-        .from('land_parcels')
-        .select('*')
-        .eq('parcel_code', parcelCode)
-        .single()
+      // Look up certificate from mock API
+      const certData = await lookupCertificate(certificateNumber)
 
-      if (error) throw error
-
-      if (data) {
-        setSurvey({
-          ...survey,
-          parcel_code: data.parcel_code,
-          land_area_m2: data.parcel_area_m2,
-          owner_name: data.owner_name || survey.owner_name,
-        })
-        toast.success("Thành công", {
-          description: "Đã tìm thấy thửa đất!",
-        })
-      } else {
+      if (!certData) {
         toast.error("Không tìm thấy", {
-          description: "Không tìm thấy thửa đất với mã này.",
+          description: "Không tìm thấy giấy chứng nhận với số này. Vui lòng kiểm tra lại.",
         })
+        return
       }
-    } catch (error) {
+
+      // Save certificate data to database
+      const { certificate, parcels } = await saveCertificateToDatabase(certData)
+
+      if (parcels.length === 0) {
+        toast.error("Lỗi", {
+          description: "Không có thửa đất nào trong giấy chứng nhận này.",
+        })
+        return
+      }
+
+      // For now, use the first parcel (in future, could let user select)
+      const parcel = parcels[0]
+
+      // Link survey to parcel
+      await linkSurveyToParcel(survey.id, parcel.id, certificate.id, user.id)
+
+      // Update local state
+      setLinkedParcel(parcel)
+      setSurvey({
+        ...survey,
+        land_parcel_id: parcel.id,
+        certificate_id: certificate.id,
+        parcel_code: parcel.parcel_code,
+        land_area_m2: parcel.total_area_m2,
+        parcel_verified_at: new Date().toISOString(),
+        parcel_verified_by: user.id,
+      })
+
+      toast.success("Thành công", {
+        description: `Đã liên kết với thửa đất ${parcel.parcel_code}!`,
+      })
+    } catch (error: any) {
+      console.error('Certificate search error:', error)
       toast.error("Lỗi", {
-        description: "Lỗi khi tìm kiếm thửa đất!",
+        description: error?.message || "Lỗi khi tìm kiếm giấy chứng nhận!",
       })
     } finally {
-      setParcelSearchLoading(false)
+      setCertificateSearchLoading(false)
+    }
+  }
+
+  const handleUnlinkParcel = async () => {
+    if (!survey || !user) return
+
+    const confirmed = window.confirm(
+      'Bạn có chắc muốn hủy liên kết thửa đất này? Thông tin chủ sở hữu từ giấy chứng nhận sẽ không còn hiển thị.'
+    )
+    if (!confirmed) return
+
+    setParcelLinking(true)
+    try {
+      await unlinkSurveyFromParcel(survey.id)
+
+      setLinkedParcel(null)
+      setSurvey({
+        ...survey,
+        land_parcel_id: null,
+        certificate_id: null,
+        parcel_code: null,
+        parcel_verified_at: null,
+        parcel_verified_by: null,
+      })
+
+      toast.success("Đã hủy liên kết", {
+        description: "Đã hủy liên kết thửa đất thành công.",
+      })
+    } catch (error: any) {
+      toast.error("Lỗi", {
+        description: error?.message || "Lỗi khi hủy liên kết!",
+      })
+    } finally {
+      setParcelLinking(false)
     }
   }
 
@@ -193,9 +268,9 @@ export default function SurveyDetailPage() {
     try {
       const updateData = {
         location_name: survey.location_name,
-        owner_name: survey.owner_name,
-        owner_phone: survey.owner_phone,
-        owner_id_number: survey.owner_id_number,
+        representative_name: survey.representative_name,
+        representative_phone: survey.representative_phone,
+        representative_id_number: survey.representative_id_number,
         notes: survey.notes,
         land_area_m2: survey.land_area_m2,
         object_type: survey.object_type,
@@ -243,6 +318,14 @@ export default function SurveyDetailPage() {
   const handleSubmitForReview = async () => {
     if (!survey || !user) {
       toast.error("Lỗi", { description: "Không có dữ liệu hoặc chưa đăng nhập" })
+      return
+    }
+
+    // Check if parcel is linked (required before submission)
+    if (!survey.land_parcel_id) {
+      toast.error("Chưa liên kết thửa đất", {
+        description: "Vui lòng tra cứu và liên kết giấy chứng nhận QSDĐ trước khi gửi hồ sơ.",
+      })
       return
     }
 
@@ -332,7 +415,6 @@ export default function SurveyDetailPage() {
       reviewed: 'Đã xem xét',
       approved_commune: 'Đã duyệt (Xã)',
       approved_central: 'Đã duyệt (TW)',
-      published: 'Đã công bố',
       rejected: 'Từ chối'
     }
     return labels[status] || status
@@ -340,10 +422,10 @@ export default function SurveyDetailPage() {
 
   const getActionLabel = (action: string) => {
     const labels: Record<string, string> = {
+      submitted: 'Gửi xem xét',
       reviewed: 'Xem xét',
       approved: 'Phê duyệt',
-      rejected: 'Từ chối',
-      published: 'Công bố'
+      rejected: 'Từ chối'
     }
     return labels[action] || action
   }
@@ -551,41 +633,273 @@ export default function SurveyDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Owner Info */}
-          <Card>
+          {/* Land Certificate Lookup - Required before submission */}
+          <Card className={!linkedParcel ? 'border-amber-300 bg-amber-50' : 'border-green-300 bg-green-50'}>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Home className="h-5 w-5 text-green-600" />
-                Thông tin chủ sở hữu
+                <FileCheck className="h-5 w-5 text-amber-600" />
+                Giấy chứng nhận QSDĐ
+                {linkedParcel ? (
+                  <span className="ml-2 flex items-center gap-1 text-sm font-normal text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Đã liên kết
+                  </span>
+                ) : (
+                  <span className="ml-2 flex items-center gap-1 text-sm font-normal text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                    <AlertCircle className="h-4 w-4" />
+                    Bắt buộc trước khi gửi
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!linkedParcel ? (
+                <>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        placeholder="Nhập số giấy chứng nhận QSDĐ..."
+                        value={certificateNumber}
+                        onChange={(e) => setCertificateNumber(e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                        list="certificate-suggestions"
+                      />
+                      <datalist id="certificate-suggestions">
+                        {availableCertificates.map((cert) => (
+                          <option key={cert} value={cert} />
+                        ))}
+                      </datalist>
+                    </div>
+                    <Button
+                      onClick={handleCertificateSearch}
+                      disabled={certificateSearchLoading || !certificateNumber}
+                      className="gap-2"
+                    >
+                      <Search className="h-4 w-4" />
+                      {certificateSearchLoading ? 'Đang tìm...' : 'Tra cứu'}
+                    </Button>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Nhập số giấy chứng nhận để tra cứu thông tin thửa đất và chủ sở hữu từ cơ sở dữ liệu Bộ TN&MT.
+                  </p>
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Số GCN mẫu để thử nghiệm:</strong>
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {availableCertificates.slice(0, 3).map((cert) => (
+                        <button
+                          key={cert}
+                          onClick={() => setCertificateNumber(cert)}
+                          className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded transition-colors"
+                        >
+                          {cert}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4">
+                  {/* Certificate Info */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border">
+                    <div>
+                      <p className="text-xs text-gray-500">Số giấy chứng nhận</p>
+                      <p className="font-medium text-sm">{linkedParcel.certificate?.certificate_number || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Số vào sổ</p>
+                      <p className="font-medium text-sm">{linkedParcel.certificate?.certificate_book_number || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Ngày cấp</p>
+                      <p className="font-medium text-sm">
+                        {linkedParcel.certificate?.issue_date
+                          ? new Date(linkedParcel.certificate.issue_date).toLocaleDateString('vi-VN')
+                          : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Cơ quan cấp</p>
+                      <p className="font-medium text-sm">{linkedParcel.certificate?.issuing_authority || '-'}</p>
+                    </div>
+                  </div>
+
+                  {/* Parcel Info */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border">
+                    <div>
+                      <p className="text-xs text-gray-500">Mã thửa đất</p>
+                      <p className="font-medium text-sm font-mono">{linkedParcel.parcel_code}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Số tờ bản đồ</p>
+                      <p className="font-medium text-sm">{linkedParcel.sheet_number || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Số thửa</p>
+                      <p className="font-medium text-sm">{linkedParcel.parcel_number || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Tổng diện tích</p>
+                      <p className="font-medium text-sm">
+                        {linkedParcel.total_area_m2?.toLocaleString('vi-VN')} m²
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Owners */}
+                  <div className="p-4 bg-white rounded-lg border">
+                    <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
+                      <Users className="h-4 w-4 text-blue-600" />
+                      Chủ sở hữu ({linkedParcel.owners.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {linkedParcel.owners.map((owner, idx) => (
+                        <div key={owner.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm">{owner.full_name}</p>
+                              {owner.is_primary_contact && (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                  Liên hệ chính
+                                </span>
+                              )}
+                              <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
+                                {owner.owner_type === 'individual' ? 'Cá nhân' :
+                                 owner.owner_type === 'organization' ? 'Tổ chức' : 'Hộ gia đình'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                              {owner.id_number && (
+                                <span className="flex items-center gap-1">
+                                  <CreditCard className="h-3 w-3" />
+                                  {owner.id_number}
+                                </span>
+                              )}
+                              {owner.phone && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {owner.phone}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-blue-600">
+                              {owner.ownership_share || 100}%
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {owner.ownership_type === 'owner' ? 'Sở hữu' :
+                               owner.ownership_type === 'co_owner' ? 'Đồng sở hữu' : 'Đại diện'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Land Uses */}
+                  <div className="p-4 bg-white rounded-lg border">
+                    <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
+                      <TreePine className="h-4 w-4 text-green-600" />
+                      Mục đích sử dụng đất ({linkedParcel.land_uses.length})
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-3 font-medium text-gray-700">Mã loại đất</th>
+                            <th className="text-left py-2 px-3 font-medium text-gray-700">Mục đích sử dụng</th>
+                            <th className="text-right py-2 px-3 font-medium text-gray-700">Diện tích</th>
+                            <th className="text-left py-2 px-3 font-medium text-gray-700">Thời hạn</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {linkedParcel.land_uses.map((use) => (
+                            <tr key={use.id} className="border-b last:border-0">
+                              <td className="py-2 px-3 font-mono">{use.land_use_type_code}</td>
+                              <td className="py-2 px-3">{use.land_use_purpose || LAND_USE_TYPES[use.land_use_type_code] || '-'}</td>
+                              <td className="py-2 px-3 text-right font-medium">
+                                {use.area_m2.toLocaleString('vi-VN')} m²
+                              </td>
+                              <td className="py-2 px-3">
+                                {use.use_term_type === 'permanent' ? (
+                                  <span className="text-green-600">Lâu dài</span>
+                                ) : use.use_end_date ? (
+                                  <span className="text-amber-600">
+                                    đến {new Date(use.use_end_date).toLocaleDateString('vi-VN')}
+                                  </span>
+                                ) : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Unlink Button */}
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUnlinkParcel}
+                      disabled={parcelLinking || survey.status !== 'pending'}
+                      className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                    >
+                      <Unlink className="h-4 w-4" />
+                      {parcelLinking ? 'Đang xử lý...' : 'Hủy liên kết'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Representative Contact (optional) */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <User className="h-5 w-5 text-gray-600" />
+                Người liên hệ tại hiện trường
+                <span className="text-xs font-normal text-gray-500">(Tùy chọn)</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-500">
+                Thông tin liên hệ được ghi nhận tại hiện trường. Đây không phải chủ sở hữu chính thức
+                (thông tin chủ sở hữu được lấy từ giấy chứng nhận QSDĐ ở trên).
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Tên chủ sở hữu</label>
+                  <label className="text-sm font-medium text-gray-700">Tên người liên hệ</label>
                   <input
                     type="text"
-                    value={survey.owner_name || ''}
-                    onChange={(e) => setSurvey({ ...survey, owner_name: e.target.value })}
+                    value={survey.representative_name || ''}
+                    onChange={(e) => setSurvey({ ...survey, representative_name: e.target.value })}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    placeholder="(Tùy chọn)"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700">Số CMND/CCCD</label>
                   <input
                     type="text"
-                    value={survey.owner_id_number || ''}
-                    onChange={(e) => setSurvey({ ...survey, owner_id_number: e.target.value })}
+                    value={survey.representative_id_number || ''}
+                    onChange={(e) => setSurvey({ ...survey, representative_id_number: e.target.value })}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    placeholder="(Tùy chọn)"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700">Số điện thoại</label>
                   <input
                     type="text"
-                    value={survey.owner_phone || ''}
-                    onChange={(e) => setSurvey({ ...survey, owner_phone: e.target.value })}
+                    value={survey.representative_phone || ''}
+                    onChange={(e) => setSurvey({ ...survey, representative_phone: e.target.value })}
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    placeholder="(Tùy chọn)"
                   />
                 </div>
               </div>
@@ -597,28 +911,10 @@ export default function SurveyDetailPage() {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Layers className="h-5 w-5 text-amber-600" />
-                Thông tin đất đai
+                Thông tin khảo sát
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  placeholder="Nhập mã thửa đất để tìm kiếm..."
-                  value={parcelCode}
-                  onChange={(e) => setParcelCode(e.target.value)}
-                  className="flex-1 rounded-md border border-gray-300 px-3 py-2"
-                />
-                <Button
-                  onClick={handleParcelSearch}
-                  disabled={parcelSearchLoading || !parcelCode}
-                  variant="secondary"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  {parcelSearchLoading ? 'Đang tìm...' : 'Tìm'}
-                </Button>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700">Mã thửa đất</label>
@@ -630,7 +926,7 @@ export default function SurveyDetailPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Diện tích (m²)</label>
+                  <label className="text-sm font-medium text-gray-700">Diện tích khảo sát (m²)</label>
                   <input
                     type="number"
                     value={survey.land_area_m2 || ''}
@@ -657,7 +953,6 @@ export default function SurveyDetailPage() {
                   />
                 </div>
               </div>
-
             </CardContent>
           </Card>
 
@@ -890,7 +1185,7 @@ export default function SurveyDetailPage() {
                 existingPhotos={survey.photos || []}
                 onPhotosChange={(photos) => setSurvey({ ...survey, photos })}
                 maxPhotos={10}
-                disabled={survey.status === 'published' || survey.status === 'approved_central'}
+                disabled={survey.status === 'approved_central'}
               />
             </CardContent>
           </Card>

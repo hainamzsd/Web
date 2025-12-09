@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { Database } from '@/lib/types/database'
 import { EntryPoint, ENTRY_TYPE_LABELS } from '@/lib/types/entry-points'
-import { X, MapPin, User, Ruler, Navigation, Calendar, ExternalLink } from 'lucide-react'
+import { X, MapPin, User, Ruler, Navigation, Calendar, ExternalLink, Search, ArrowRight, Tag, Building } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet-draw/dist/leaflet.draw.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
@@ -24,6 +24,9 @@ interface EnhancedSurveyMapProps {
   onSurveySelect?: (survey: SurveyLocation | null) => void
   entryPoints?: EntryPoint[]
   showInfoCard?: boolean
+  height?: string
+  showSearch?: boolean
+  baseDetailUrl?: string
 }
 
 function EnhancedSurveyMapComponent({
@@ -37,7 +40,10 @@ function EnhancedSurveyMapComponent({
   selectedSurveyId,
   onSurveySelect,
   entryPoints = [],
-  showInfoCard = true
+  showInfoCard = true,
+  height = '600px',
+  showSearch = true,
+  baseDetailUrl = '/commune/surveys'
 }: EnhancedSurveyMapProps) {
   const mapRef = useRef<any>(null)
   const leafletRef = useRef<any>(null)
@@ -51,6 +57,61 @@ function EnhancedSurveyMapComponent({
   const [mapId] = useState(`enhanced-map-${Math.random().toString(36).substr(2, 9)}`)
   const [isMapReady, setIsMapReady] = useState(false)
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyLocation | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SurveyLocation[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
+
+  // Search function - search by location_identifier, location_name, address, owner_name
+  const handleSearch = useCallback(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      setShowSearchResults(false)
+      return
+    }
+
+    setIsSearching(true)
+    const query = searchQuery.toLowerCase().trim()
+
+    const results = surveys.filter(survey => {
+      // Search by location identifier (exact or partial match)
+      if (survey.location_identifier?.toLowerCase().includes(query)) return true
+      // Search by location name
+      if (survey.location_name?.toLowerCase().includes(query)) return true
+      // Search by address
+      if (survey.address?.toLowerCase().includes(query)) return true
+      // Search by owner name
+      if (survey.owner_name?.toLowerCase().includes(query)) return true
+      return false
+    })
+
+    setSearchResults(results.slice(0, 10)) // Limit to 10 results
+    setShowSearchResults(true)
+    setIsSearching(false)
+  }, [searchQuery, surveys])
+
+  // Handle search on Enter key
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch()
+    }
+  }
+
+  // Navigate to search result
+  const goToSurvey = (survey: SurveyLocation) => {
+    setSelectedSurvey(survey)
+    setShowSearchResults(false)
+    if (mapRef.current && survey.latitude && survey.longitude) {
+      // Use flyTo for smooth animation, zoom level 17 for good tile coverage
+      mapRef.current.flyTo([survey.latitude, survey.longitude], 17, {
+        duration: 1.5,
+        easeLinearity: 0.25
+      })
+    }
+    if (onSurveySelect) {
+      onSurveySelect(survey)
+    }
+  }
 
   // Helper function to parse polygon geometry
   const parsePolygonGeometry = (geometry: any): [number, number][] => {
@@ -123,7 +184,7 @@ function EnhancedSurveyMapComponent({
         polygonLayerRef.current = polygon
 
         // Fit map to polygon bounds
-        mapRef.current.fitBounds(polygon.getBounds(), { padding: [50, 50], maxZoom: 20 })
+        mapRef.current.fitBounds(polygon.getBounds(), { padding: [50, 50], maxZoom: 18 })
       }
     }
   }, [selectedSurvey, isMapReady])
@@ -289,7 +350,8 @@ function EnhancedSurveyMapComponent({
 
       leafletRef.current.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 22,
+        maxZoom: 19,
+        maxNativeZoom: 19,
       }).addTo(map)
 
       mapRef.current = map
@@ -406,7 +468,7 @@ function EnhancedSurveyMapComponent({
         const heat = (L as any).heatLayer(heatPoints, {
           radius: 25,
           blur: 15,
-          maxZoom: 20,
+          maxZoom: 18,
           gradient: {
             0.0: '#3b82f6',
             0.5: '#f59e0b',
@@ -465,7 +527,7 @@ function EnhancedSurveyMapComponent({
               </p>
               ${survey.owner_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${survey.owner_name}</p>` : ''}
               ${hasPolygon ? '<p style="font-size: 11px; color: #3b82f6;">📐 Có dữ liệu ranh giới</p>' : ''}
-              <a href="/commune/surveys/${survey.id}" style="color: #3b82f6; text-decoration: underline; font-size: 12px;">
+              <a href="${baseDetailUrl}/${survey.id}" style="color: #3b82f6; text-decoration: underline; font-size: 12px;">
                 Xem chi tiết →
               </a>
             </div>
@@ -533,7 +595,7 @@ function EnhancedSurveyMapComponent({
               </p>
               ${survey.owner_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${survey.owner_name}</p>` : ''}
               ${hasPolygon ? '<p style="font-size: 11px; color: #3b82f6;">📐 Có dữ liệu ranh giới</p>' : ''}
-              <a href="/commune/surveys/${survey.id}" style="color: #3b82f6; text-decoration: underline; font-size: 12px;">
+              <a href="${baseDetailUrl}/${survey.id}" style="color: #3b82f6; text-decoration: underline; font-size: 12px;">
                 Xem chi tiết →
               </a>
             </div>
@@ -544,9 +606,12 @@ function EnhancedSurveyMapComponent({
             if (onSurveySelect) {
               onSurveySelect(survey)
             }
-            // Auto zoom to the selected point
+            // Smooth fly to the selected point with reasonable zoom
             if (mapRef.current) {
-              mapRef.current.setView([survey.latitude!, survey.longitude!], 19, { animate: true })
+              mapRef.current.flyTo([survey.latitude!, survey.longitude!], 17, {
+                duration: 1.2,
+                easeLinearity: 0.25
+              })
             }
           })
 
@@ -559,13 +624,13 @@ function EnhancedSurveyMapComponent({
         // Fit bounds only if no survey is selected
         if (!selectedSurvey) {
           const bounds = L.latLngBounds(validSurveys.map(s => [s.latitude!, s.longitude!]))
-          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 })
+          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
         }
       }
     }
 
     updateMarkers()
-  }, [surveys, mapMode, showHeatmap, showClustering, selectedSurveyId, isMapReady])
+  }, [surveys, mapMode, showHeatmap, showClustering, selectedSurveyId, isMapReady, baseDetailUrl])
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -600,11 +665,99 @@ function EnhancedSurveyMapComponent({
   }
 
   return (
-    <div className="relative">
-      <div id={mapId} className="w-full h-[600px] rounded-lg shadow-lg border-2 border-gray-200 z-0"></div>
+    <div className="relative w-full" style={{ height }}>
+      {/* Search Bar - Top Center */}
+      {showSearch && (
+        <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-[1001] w-full max-w-md px-4">
+          <div className="relative">
+            <div className="flex items-center bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+              <div className="pl-4 pr-2">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Tìm theo mã định danh, tên, địa chỉ..."
+                className="flex-1 py-3 px-2 text-sm focus:outline-none"
+              />
+              <button
+                onClick={handleSearch}
+                disabled={isSearching}
+                className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+              >
+                {isSearching ? 'Đang tìm...' : 'Tìm'}
+              </button>
+            </div>
 
-      {/* Map Controls */}
-      <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg p-2 space-y-2">
+            {/* Search Results Dropdown */}
+            {showSearchResults && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-80 overflow-y-auto">
+                {searchResults.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">
+                    <Search className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm">Không tìm thấy kết quả</p>
+                    <p className="text-xs text-gray-400 mt-1">Thử tìm với từ khóa khác</p>
+                  </div>
+                ) : (
+                  <div className="py-2">
+                    <div className="px-3 py-2 text-xs font-medium text-gray-500 bg-gray-50">
+                      Tìm thấy {searchResults.length} kết quả
+                    </div>
+                    {searchResults.map((survey) => (
+                      <button
+                        key={survey.id}
+                        onClick={() => goToSurvey(survey)}
+                        className="w-full px-4 py-3 hover:bg-blue-50 flex items-start gap-3 border-b border-gray-100 last:border-0 transition-colors text-left"
+                      >
+                        <div className={`mt-0.5 w-3 h-3 rounded-full flex-shrink-0 ${
+                          survey.status === 'published' ? 'bg-green-500' :
+                          survey.status === 'approved_central' ? 'bg-blue-500' :
+                          survey.status === 'approved_commune' ? 'bg-purple-500' :
+                          survey.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm text-gray-900 truncate">
+                              {survey.location_name || 'Chưa đặt tên'}
+                            </span>
+                            {survey.location_identifier && (
+                              <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-mono">
+                                {survey.location_identifier}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 truncate mt-0.5">
+                            {survey.address || 'Chưa có địa chỉ'}
+                          </p>
+                          {survey.owner_name && (
+                            <p className="text-xs text-gray-400 truncate">
+                              Chủ: {survey.owner_name}
+                            </p>
+                          )}
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowSearchResults(false)}
+                  className="w-full py-2 text-xs text-gray-500 hover:bg-gray-50 border-t"
+                >
+                  Đóng
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div id={mapId} className="absolute inset-0 w-full h-full z-0"></div>
+
+      {/* Map Controls - Top Right */}
+      <div className="absolute top-3 right-3 z-[1000] bg-white rounded-lg shadow-lg p-2 space-y-2">
         <button
           onClick={() => setMapMode('markers')}
           className={`w-full px-4 py-2 rounded text-sm font-medium transition-colors ${mapMode === 'markers'
@@ -634,8 +787,8 @@ function EnhancedSurveyMapComponent({
         </button>
       </div>
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-[1000] bg-white rounded-lg shadow-lg p-3 max-h-[300px] overflow-y-auto">
+      {/* Legend - Bottom Right */}
+      <div className="absolute bottom-3 right-3 z-[1000] bg-white rounded-lg shadow-lg p-3 max-h-[200px] overflow-y-auto">
         <h4 className="font-semibold text-sm mb-2">Trạng thái khảo sát</h4>
         <div className="space-y-1 text-xs">
           <div className="flex items-center gap-2">
@@ -681,13 +834,20 @@ function EnhancedSurveyMapComponent({
         )}
       </div>
 
-      {/* Info Card - Bottom Right */}
+      {/* Info Card - Left Side */}
       {showInfoCard && selectedSurvey && (
-        <div className="absolute bottom-4 right-4 z-[1000] bg-white rounded-xl shadow-xl border border-gray-200 w-80 overflow-hidden animate-in slide-in-from-right-5 duration-300">
-          {/* Header */}
+        <div className="absolute top-3 left-3 z-[1001] bg-white rounded-xl shadow-xl border border-gray-200 w-80 max-h-[calc(100%-24px)] overflow-hidden animate-in slide-in-from-left-5 duration-300">
+          {/* Header with Location ID */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 text-white">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  {selectedSurvey.location_identifier && (
+                    <span className="text-xs bg-white/20 px-2 py-0.5 rounded font-mono">
+                      {selectedSurvey.location_identifier}
+                    </span>
+                  )}
+                </div>
                 <h3 className="font-semibold text-sm truncate">
                   {selectedSurvey.location_name || 'Chưa đặt tên'}
                 </h3>
@@ -697,7 +857,7 @@ function EnhancedSurveyMapComponent({
               </div>
               <button
                 onClick={() => setSelectedSurvey(null)}
-                className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+                className="ml-2 p-1.5 hover:bg-white/20 rounded-full transition-colors flex-shrink-0"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -705,7 +865,7 @@ function EnhancedSurveyMapComponent({
           </div>
 
           {/* Content */}
-          <div className="p-4 space-y-3">
+          <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
             {/* Status */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-500">Trạng thái</span>
@@ -715,11 +875,11 @@ function EnhancedSurveyMapComponent({
             </div>
 
             {/* Quick Info Grid */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {selectedSurvey.owner_name && (
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-gray-400" />
-                  <div className="min-w-0">
+                <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                  <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs text-gray-500">Chủ sở hữu</p>
                     <p className="text-sm font-medium truncate">{selectedSurvey.owner_name}</p>
                   </div>
@@ -727,8 +887,8 @@ function EnhancedSurveyMapComponent({
               )}
 
               {selectedSurvey.land_area_m2 && (
-                <div className="flex items-center gap-2">
-                  <Ruler className="h-4 w-4 text-gray-400" />
+                <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                  <Ruler className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   <div>
                     <p className="text-xs text-gray-500">Diện tích</p>
                     <p className="text-sm font-medium">{selectedSurvey.land_area_m2.toLocaleString('vi-VN')} m²</p>
@@ -736,17 +896,29 @@ function EnhancedSurveyMapComponent({
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
-                <Navigation className="h-4 w-4 text-gray-400" />
+              {selectedSurvey.object_type && (
+                <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                  <Building className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500">Loại đối tượng</p>
+                    <p className="text-sm font-medium">{selectedSurvey.object_type}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                <Navigation className="h-4 w-4 text-gray-400 flex-shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-500">Tọa độ</p>
-                  <p className="text-xs font-mono">{selectedSurvey.latitude.toFixed(5)}, {selectedSurvey.longitude.toFixed(5)}</p>
+                  <p className="text-xs text-gray-500">Tọa độ GPS</p>
+                  <p className="text-xs font-mono text-gray-700">
+                    {selectedSurvey.latitude?.toFixed(6)}, {selectedSurvey.longitude?.toFixed(6)}
+                  </p>
                 </div>
               </div>
 
               {selectedSurvey.accuracy && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-gray-400" />
+                <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                  <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   <div>
                     <p className="text-xs text-gray-500">Độ chính xác</p>
                     <p className="text-sm font-medium">±{selectedSurvey.accuracy.toFixed(2)}m</p>
@@ -754,6 +926,14 @@ function EnhancedSurveyMapComponent({
                 </div>
               )}
             </div>
+
+            {/* Polygon indicator */}
+            {selectedSurvey.polygon_geometry && (
+              <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg text-blue-700">
+                <Tag className="h-4 w-4" />
+                <span className="text-xs font-medium">Có dữ liệu ranh giới polygon</span>
+              </div>
+            )}
 
             {/* Date */}
             <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
@@ -764,19 +944,22 @@ function EnhancedSurveyMapComponent({
             {/* Actions */}
             <div className="flex gap-2 pt-2">
               <a
-                href={`/commune/surveys/${selectedSurvey.id}`}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors"
+                href={`${baseDetailUrl}/${selectedSurvey.id}`}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-colors"
               >
                 <ExternalLink className="h-4 w-4" />
                 Xem chi tiết
               </a>
               <button
                 onClick={() => {
-                  if (mapRef.current) {
-                    mapRef.current.setView([selectedSurvey.latitude, selectedSurvey.longitude], 20, { animate: true })
+                  if (mapRef.current && selectedSurvey.latitude && selectedSurvey.longitude) {
+                    mapRef.current.flyTo([selectedSurvey.latitude, selectedSurvey.longitude], 18, {
+                      duration: 1,
+                      easeLinearity: 0.25
+                    })
                   }
                 }}
-                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
               >
                 Zoom
               </button>

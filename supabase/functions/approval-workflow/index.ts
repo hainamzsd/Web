@@ -59,6 +59,7 @@ serve(async (req) => {
 
     let newStatus = survey.status
     let actionType = action
+    let locationId: string | null = null
 
     // Determine new status based on role and action
     if (action === 'approve') {
@@ -66,6 +67,45 @@ serve(async (req) => {
         newStatus = 'approved_commune'
       } else if (webUser.role === 'central_admin') {
         newStatus = 'approved_central'
+
+        // Generate location identifier for central admin approval
+        // Format: PPWWWWNNNNNN (12 digits, no dashes)
+        const provinceCode = String(survey.province_id || 0).padStart(2, '0')
+        const wardCode = String(survey.ward_id || 0).padStart(4, '0')
+        const adminCode = `${provinceCode}${wardCode}`
+
+        // Generate random 6-digit number and retry if duplicate
+        const maxRetries = 10
+        let inserted = false
+
+        for (let attempt = 0; attempt < maxRetries && !inserted; attempt++) {
+          const randomNum = Math.floor(Math.random() * 999999) + 1
+          const randomStr = String(randomNum).padStart(6, '0')
+          locationId = `${adminCode}${randomStr}`
+
+          const { error: insertError } = await supabaseClient
+            .from('location_identifiers')
+            .insert({
+              survey_location_id,
+              location_id: locationId,
+              admin_code: adminCode,
+              sequence_number: randomStr,
+              assigned_by: user.id,
+              is_active: true
+            })
+
+          if (!insertError) {
+            inserted = true
+          } else if (insertError.code !== '23505') {
+            // Not a duplicate error, throw it
+            throw insertError
+          }
+          // If duplicate (23505), loop will retry with new random number
+        }
+
+        if (!inserted) {
+          throw new Error('Failed to generate unique location identifier after multiple attempts')
+        }
       }
     } else if (action === 'reject') {
       newStatus = 'rejected'
@@ -74,18 +114,27 @@ serve(async (req) => {
       actionType = 'approved'
     }
 
-    // Update survey status
+    // Update survey status (and location_identifier if generated)
+    const updateData: Record<string, unknown> = {
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    }
+    if (locationId) {
+      updateData.location_identifier = locationId
+    }
+
     const { error: updateError } = await supabaseClient
       .from('survey_locations')
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', survey_location_id)
 
     if (updateError) throw updateError
 
     // Add to approval history
+    const historyNotes = locationId
+      ? `${notes || ''} Mã định danh: ${locationId}`.trim()
+      : notes || ''
+
     const { error: historyError } = await supabaseClient
       .from('approval_history')
       .insert({
@@ -95,7 +144,7 @@ serve(async (req) => {
         actor_role: webUser.role,
         previous_status: survey.status,
         new_status: newStatus,
-        notes: notes || '',
+        notes: historyNotes,
       })
 
     if (historyError) throw historyError
@@ -104,6 +153,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         new_status: newStatus,
+        location_id: locationId,
         message: 'Workflow action completed successfully'
       }),
       {

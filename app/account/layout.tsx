@@ -4,10 +4,9 @@ import { useAuth } from '@/lib/auth/auth-context'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 
-export default function CommuneLayout({ children }: { children: React.ReactNode }) {
+export default function AccountLayout({ children }: { children: React.ReactNode }) {
   const { webUser, user, loading } = useAuth()
 
-  // Show loading spinner only during initial auth check
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -16,11 +15,10 @@ export default function CommuneLayout({ children }: { children: React.ReactNode 
     )
   }
 
-  // If not logged in, middleware will handle redirect
   if (!user) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p className="text-gray-500">Đang chuyển hướng...</p>
+        <p className="text-gray-500">Redirecting...</p>
       </div>
     )
   }

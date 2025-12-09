@@ -10,7 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { QualityScore, calculateQualityScore } from '@/components/ui/quality-score'
-import { ArrowLeft, CheckCircle, XCircle, Globe, MapPin, User, FileText, Clock, Camera, History, LogIn } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, MapPin, User, FileText, Clock, Camera, History, LogIn, Users, TreePine, CreditCard, Phone } from 'lucide-react'
+import { getParcelWithDetails, LAND_USE_TYPES } from '@/lib/services/certificate-service'
+import type { LandParcelWithDetails } from '@/lib/types/database'
 import Link from 'next/link'
 import nextDynamic from 'next/dynamic'
 import Image from 'next/image'
@@ -19,6 +21,7 @@ import { toast } from 'sonner'
 import { EntryPointsSection } from '@/components/survey/entry-points-section'
 import { EntryPoint } from '@/lib/types/entry-points'
 import { getEntryPoints } from '@/lib/services/entry-points-service'
+import { RejectSurveyModal, RejectionData, REJECTION_REASONS } from '@/components/survey/reject-survey-modal'
 
 const EnhancedSurveyMap = nextDynamic(
   () => import('@/components/map/enhanced-survey-map').then(mod => mod.EnhancedSurveyMap),
@@ -38,10 +41,12 @@ export default function CentralSurveyDetailPage() {
   const [survey, setSurvey] = useState<SurveyLocation | null>(null)
   const [approvalHistory, setApprovalHistory] = useState<ApprovalHistory[]>([])
   const [entryPoints, setEntryPoints] = useState<EntryPoint[]>([])
+  const [linkedParcel, setLinkedParcel] = useState<LandParcelWithDetails | null>(null)
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
+  const [showRejectModal, setShowRejectModal] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -91,6 +96,14 @@ export default function CentralSurveyDetailPage() {
             const entryPointsData = await getEntryPoints(surveyData.id)
             if (mounted) {
               setEntryPoints(entryPointsData)
+            }
+          }
+
+          // Fetch linked parcel if exists
+          if (surveyData?.land_parcel_id) {
+            const parcelData = await getParcelWithDetails(surveyData.land_parcel_id)
+            if (mounted && parcelData) {
+              setLinkedParcel(parcelData)
             }
           }
         }
@@ -161,62 +174,22 @@ export default function CentralSurveyDetailPage() {
     }
   }
 
-  const handlePublish = async () => {
-    if (!survey || !user) return
-    setSaving(true)
-
-    try {
-      const { error: updateError } = await supabase
-        .from('survey_locations')
-        .update({
-          status: 'published',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', survey.id)
-
-      if (updateError) throw updateError
-
-      const { error: historyError } = await supabase
-        .from('approval_history')
-        .insert({
-          survey_location_id: survey.id,
-          action: 'published',
-          actor_id: user.id,
-          actor_role: webUser?.role || 'central_admin',
-          previous_status: survey.status,
-          new_status: 'published',
-          notes: notes || 'Published by central admin',
-        })
-
-      if (historyError) throw historyError
-
-      toast.success("Thành công", {
-        description: "Đã xuất bản khảo sát!",
-      })
-      router.push('/central/surveys')
-    } catch (error) {
-      console.error('Error publishing survey:', error)
-      toast.error("Lỗi", {
-        description: "Lỗi khi xuất bản!",
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleReject = async () => {
+  const handleReject = async (rejectionData: RejectionData) => {
     if (!survey || !user) {
       return
     }
-    if (!notes) {
-      toast.error("Thiếu thông tin", {
-        description: "Vui lòng nhập lý do từ chối",
-      })
-      return
-    }
     setSaving(true)
 
     try {
+      // Build rejection notes with reason
+      let rejectionNotes = `[${rejectionData.reasonLabel}]`
+      if (rejectionData.customReason) {
+        rejectionNotes += ` ${rejectionData.customReason}`
+      }
+      if (rejectionData.notes) {
+        rejectionNotes += ` - ${rejectionData.notes}`
+      }
+
       const { error: updateError } = await supabase
         .from('survey_locations')
         .update({
@@ -227,6 +200,14 @@ export default function CentralSurveyDetailPage() {
 
       if (updateError) throw updateError
 
+      // Store rejection data in metadata for easier parsing on app side
+      const metadata = {
+        rejection_reason_id: rejectionData.reasonId,
+        rejection_reason_label: rejectionData.reasonLabel,
+        rejection_custom_reason: rejectionData.customReason || null,
+        rejection_additional_notes: rejectionData.notes || null
+      }
+
       const { error: historyError } = await supabase
         .from('approval_history')
         .insert({
@@ -236,11 +217,13 @@ export default function CentralSurveyDetailPage() {
           actor_role: webUser?.role || 'central_admin',
           previous_status: survey.status,
           new_status: 'rejected',
-          notes: notes,
+          notes: rejectionNotes,
+          metadata: metadata,
         })
 
       if (historyError) throw historyError
 
+      setShowRejectModal(false)
       toast.success("Thành công", {
         description: "Đã từ chối khảo sát!",
       })
@@ -261,7 +244,6 @@ export default function CentralSurveyDetailPage() {
       reviewed: 'Đã xem xét',
       approved: 'Đã phê duyệt',
       rejected: 'Đã từ chối',
-      published: 'Đã xuất bản',
     }
     return labels[action] || action
   }
@@ -272,7 +254,6 @@ export default function CentralSurveyDetailPage() {
       reviewed: 'bg-yellow-100 text-yellow-700',
       approved: 'bg-green-100 text-green-700',
       rejected: 'bg-red-100 text-red-700',
-      published: 'bg-purple-100 text-purple-700',
     }
     return colors[action] || 'bg-gray-100 text-gray-700'
   }
@@ -306,8 +287,7 @@ export default function CentralSurveyDetailPage() {
 
   const qualityScore = calculateQualityScore(survey)
   const canApprove = survey.status === 'approved_commune'
-  const canPublish = survey.status === 'approved_central'
-  const isFinalized = survey.status === 'published' || survey.status === 'rejected'
+  const isFinalized = survey.status === 'approved_central' || survey.status === 'rejected'
 
   return (
     <div className="space-y-6">
@@ -419,26 +399,31 @@ export default function CentralSurveyDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Owner Info */}
+        {/* Representative Contact & Notes */}
         <Card className="shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-slate-50">
             <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5 text-purple-600" />
-              Thông tin chủ sở hữu
+              <User className="h-5 w-5 text-gray-600" />
+              Người liên hệ tại hiện trường
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
-            <div>
-              <p className="text-sm text-gray-500">Tên chủ sở hữu</p>
-              <p className="font-medium text-lg">{survey.owner_name || '-'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Số CMND/CCCD</p>
-              <p className="font-medium font-mono">{survey.owner_id_number || '-'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Số điện thoại</p>
-              <p className="font-medium">{survey.owner_phone || '-'}</p>
+            <p className="text-sm text-gray-500 italic">
+              Thông tin liên hệ ghi nhận tại hiện trường (không phải chủ sở hữu chính thức)
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Tên người liên hệ</p>
+                <p className="font-medium">{survey.representative_name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Số CMND/CCCD</p>
+                <p className="font-medium font-mono">{survey.representative_id_number || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Số điện thoại</p>
+                <p className="font-medium">{survey.representative_phone || '-'}</p>
+              </div>
             </div>
             <div className="pt-4 border-t">
               <p className="text-sm text-gray-500">Ghi chú</p>
@@ -447,6 +432,177 @@ export default function CentralSurveyDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Land Certificate & Parcel Info */}
+      {linkedParcel ? (
+        <Card className="shadow-lg border-2 border-green-200">
+          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-green-600" />
+              Giấy chứng nhận QSDĐ
+              <span className="ml-2 text-sm font-normal text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                Đã liên kết
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-6">
+            {/* Certificate Info */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border">
+              <div>
+                <p className="text-xs text-gray-500">Số giấy chứng nhận</p>
+                <p className="font-medium text-sm">{linkedParcel.certificate?.certificate_number || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Số vào sổ</p>
+                <p className="font-medium text-sm">{linkedParcel.certificate?.certificate_book_number || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Ngày cấp</p>
+                <p className="font-medium text-sm">
+                  {linkedParcel.certificate?.issue_date
+                    ? new Date(linkedParcel.certificate.issue_date).toLocaleDateString('vi-VN')
+                    : '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Cơ quan cấp</p>
+                <p className="font-medium text-sm">{linkedParcel.certificate?.issuing_authority || '-'}</p>
+              </div>
+            </div>
+
+            {/* Parcel Info */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-white rounded-lg border">
+              <div>
+                <p className="text-xs text-gray-500">Mã thửa đất</p>
+                <p className="font-medium text-sm font-mono">{linkedParcel.parcel_code}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Số tờ bản đồ</p>
+                <p className="font-medium text-sm">{linkedParcel.sheet_number || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Số thửa</p>
+                <p className="font-medium text-sm">{linkedParcel.parcel_number || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Tổng diện tích</p>
+                <p className="font-medium text-sm">
+                  {linkedParcel.total_area_m2?.toLocaleString('vi-VN')} m²
+                </p>
+              </div>
+            </div>
+
+            {/* Owners */}
+            <div className="p-4 bg-white rounded-lg border">
+              <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
+                <Users className="h-4 w-4 text-blue-600" />
+                Chủ sở hữu chính thức ({linkedParcel.owners.length})
+              </h4>
+              <div className="space-y-2">
+                {linkedParcel.owners.map((owner) => (
+                  <div key={owner.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{owner.full_name}</p>
+                        {owner.is_primary_contact && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                            Liên hệ chính
+                          </span>
+                        )}
+                        <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
+                          {owner.owner_type === 'individual' ? 'Cá nhân' :
+                           owner.owner_type === 'organization' ? 'Tổ chức' : 'Hộ gia đình'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                        {owner.id_number && (
+                          <span className="flex items-center gap-1">
+                            <CreditCard className="h-3 w-3" />
+                            {owner.id_number}
+                          </span>
+                        )}
+                        {owner.phone && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {owner.phone}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-blue-600">
+                        {owner.ownership_share || 100}%
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {owner.ownership_type === 'owner' ? 'Sở hữu' :
+                         owner.ownership_type === 'co_owner' ? 'Đồng sở hữu' : 'Đại diện'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Land Uses */}
+            <div className="p-4 bg-white rounded-lg border">
+              <h4 className="font-medium text-sm flex items-center gap-2 mb-3">
+                <TreePine className="h-4 w-4 text-green-600" />
+                Mục đích sử dụng đất ({linkedParcel.land_uses.length})
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-3 font-medium text-gray-700">Mã loại đất</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700">Mục đích sử dụng</th>
+                      <th className="text-right py-2 px-3 font-medium text-gray-700">Diện tích</th>
+                      <th className="text-left py-2 px-3 font-medium text-gray-700">Thời hạn</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linkedParcel.land_uses.map((use) => (
+                      <tr key={use.id} className="border-b last:border-0">
+                        <td className="py-2 px-3 font-mono">{use.land_use_type_code}</td>
+                        <td className="py-2 px-3">{use.land_use_purpose || LAND_USE_TYPES[use.land_use_type_code] || '-'}</td>
+                        <td className="py-2 px-3 text-right font-medium">
+                          {use.area_m2.toLocaleString('vi-VN')} m²
+                        </td>
+                        <td className="py-2 px-3">
+                          {use.use_term_type === 'permanent' ? (
+                            <span className="text-green-600">Lâu dài</span>
+                          ) : use.use_end_date ? (
+                            <span className="text-amber-600">
+                              đến {new Date(use.use_end_date).toLocaleDateString('vi-VN')}
+                            </span>
+                          ) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="shadow-lg border-2 border-amber-200">
+          <CardHeader className="bg-gradient-to-r from-amber-50 to-yellow-50">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-amber-600" />
+              Giấy chứng nhận QSDĐ
+              <span className="ml-2 text-sm font-normal text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                Chưa liên kết
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-center text-gray-500 py-4">
+              Khảo sát này chưa được liên kết với giấy chứng nhận QSDĐ.
+              Thông tin chủ sở hữu chính thức chưa được xác minh.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Photos Section */}
       <Card className="shadow-lg">
@@ -624,40 +780,29 @@ export default function CentralSurveyDetailPage() {
 
             <div className="flex gap-4 pt-2">
               {canApprove && (
-                <Button
-                  onClick={handleApprove}
-                  disabled={saving}
-                  className="gap-2 bg-green-600 hover:bg-green-700"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  {saving ? 'Đang xử lý...' : 'Phê duyệt cấp trung ương'}
-                </Button>
+                <>
+                  <Button
+                    onClick={handleApprove}
+                    disabled={saving}
+                    className="gap-2 bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    {saving ? 'Đang xử lý...' : 'Phê duyệt cấp trung ương'}
+                  </Button>
+
+                  <Button
+                    onClick={() => setShowRejectModal(true)}
+                    disabled={saving}
+                    variant="destructive"
+                    className="gap-2"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    {saving ? 'Đang xử lý...' : 'Từ chối'}
+                  </Button>
+                </>
               )}
 
-              {canPublish && (
-                <Button
-                  onClick={handlePublish}
-                  disabled={saving}
-                  className="gap-2 bg-purple-600 hover:bg-purple-700"
-                >
-                  <Globe className="h-4 w-4" />
-                  {saving ? 'Đang xử lý...' : 'Xuất bản'}
-                </Button>
-              )}
-
-              {(canApprove || canPublish) && (
-                <Button
-                  onClick={handleReject}
-                  disabled={saving}
-                  variant="destructive"
-                  className="gap-2"
-                >
-                  <XCircle className="h-4 w-4" />
-                  {saving ? 'Đang xử lý...' : 'Từ chối'}
-                </Button>
-              )}
-
-              {!canApprove && !canPublish && (
+              {!canApprove && (
                 <p className="text-amber-600 bg-amber-50 px-4 py-2 rounded-lg">
                   Khảo sát này đang ở trạng thái <strong>{survey.status}</strong> và chưa sẵn sàng để phê duyệt cấp trung ương.
                 </p>
@@ -693,6 +838,15 @@ export default function CentralSurveyDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Reject Survey Modal */}
+      <RejectSurveyModal
+        isOpen={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        onConfirm={handleReject}
+        surveyName={survey.location_name || 'Chưa đặt tên'}
+        isLoading={saving}
+      />
     </div>
   )
 }

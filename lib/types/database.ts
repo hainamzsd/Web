@@ -179,15 +179,21 @@ export interface Database {
           polygon_geometry: Json | null
           object_type: string | null
           land_use_type: string | null
-          owner_name: string | null
-          owner_id_number: string | null
-          owner_phone: string | null
+          // Representative contact (optional on-site contact, NOT official owner)
+          representative_name: string | null
+          representative_id_number: string | null
+          representative_phone: string | null
           parcel_code: string | null
           land_area_m2: number | null
           photos: string[]
           notes: string | null
-          status: 'pending' | 'reviewed' | 'approved_commune' | 'rejected' | 'approved_central' | 'published'
+          status: 'pending' | 'reviewed' | 'approved_commune' | 'rejected' | 'approved_central'
           location_identifier: string | null
+          // Land parcel linkage
+          land_parcel_id: string | null
+          certificate_id: string | null
+          parcel_verified_at: string | null
+          parcel_verified_by: string | null
           created_at: string
           updated_at: string
         }
@@ -210,15 +216,19 @@ export interface Database {
           polygon_geometry?: Json | null
           object_type?: string | null
           land_use_type?: string | null
-          owner_name?: string | null
-          owner_id_number?: string | null
-          owner_phone?: string | null
+          representative_name?: string | null
+          representative_id_number?: string | null
+          representative_phone?: string | null
           parcel_code?: string | null
           land_area_m2?: number | null
           photos?: string[]
           notes?: string | null
-          status?: 'pending' | 'reviewed' | 'approved_commune' | 'rejected' | 'approved_central' | 'published'
+          status?: 'pending' | 'reviewed' | 'approved_commune' | 'rejected' | 'approved_central'
           location_identifier?: string | null
+          land_parcel_id?: string | null
+          certificate_id?: string | null
+          parcel_verified_at?: string | null
+          parcel_verified_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -241,15 +251,19 @@ export interface Database {
           polygon_geometry?: Json | null
           object_type?: string | null
           land_use_type?: string | null
-          owner_name?: string | null
-          owner_id_number?: string | null
-          owner_phone?: string | null
+          representative_name?: string | null
+          representative_id_number?: string | null
+          representative_phone?: string | null
           parcel_code?: string | null
           land_area_m2?: number | null
           photos?: string[]
           notes?: string | null
-          status?: 'pending' | 'reviewed' | 'approved_commune' | 'rejected' | 'approved_central' | 'published'
+          status?: 'pending' | 'reviewed' | 'approved_commune' | 'rejected' | 'approved_central'
           location_identifier?: string | null
+          land_parcel_id?: string | null
+          certificate_id?: string | null
+          parcel_verified_at?: string | null
+          parcel_verified_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -336,57 +350,189 @@ export interface Database {
       land_parcels: {
         Row: {
           id: string
+          certificate_id: string | null
           parcel_code: string
-          province_code: string
-          district_code: string
-          ward_code: string
+          sheet_number: string | null
+          parcel_number: string | null
           province_id: number | null
           ward_id: number | null
-          owner_name: string | null
-          owner_id_number: string | null
-          owner_phone: string | null
-          land_use_certificate_number: string | null
-          parcel_area_m2: number | null
-          land_use_type_code: string | null
+          address: string | null
+          total_area_m2: number | null
           geometry: Json | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
+          certificate_id?: string | null
           parcel_code: string
-          province_code: string
-          district_code: string
-          ward_code: string
+          sheet_number?: string | null
+          parcel_number?: string | null
           province_id?: number | null
           ward_id?: number | null
-          owner_name?: string | null
-          owner_id_number?: string | null
-          owner_phone?: string | null
-          land_use_certificate_number?: string | null
-          parcel_area_m2?: number | null
-          land_use_type_code?: string | null
+          address?: string | null
+          total_area_m2?: number | null
           geometry?: Json | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
+          certificate_id?: string | null
           parcel_code?: string
-          province_code?: string
-          district_code?: string
-          ward_code?: string
+          sheet_number?: string | null
+          parcel_number?: string | null
           province_id?: number | null
           ward_id?: number | null
-          owner_name?: string | null
-          owner_id_number?: string | null
-          owner_phone?: string | null
-          land_use_certificate_number?: string | null
-          parcel_area_m2?: number | null
-          land_use_type_code?: string | null
+          address?: string | null
+          total_area_m2?: number | null
           geometry?: Json | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      land_certificates: {
+        Row: {
+          id: string
+          certificate_number: string
+          certificate_book_number: string | null
+          issue_date: string | null
+          issuing_authority: string | null
+          province_id: number | null
+          ward_id: number | null
+          is_active: boolean
+          deactivated_at: string | null
+          deactivation_reason: string | null
+          fetched_from_api_at: string | null
+          api_response_data: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          certificate_number: string
+          certificate_book_number?: string | null
+          issue_date?: string | null
+          issuing_authority?: string | null
+          province_id?: number | null
+          ward_id?: number | null
+          is_active?: boolean
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
+          fetched_from_api_at?: string | null
+          api_response_data?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          certificate_number?: string
+          certificate_book_number?: string | null
+          issue_date?: string | null
+          issuing_authority?: string | null
+          province_id?: number | null
+          ward_id?: number | null
+          is_active?: boolean
+          deactivated_at?: string | null
+          deactivation_reason?: string | null
+          fetched_from_api_at?: string | null
+          api_response_data?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      land_parcel_owners: {
+        Row: {
+          id: string
+          land_parcel_id: string
+          owner_type: 'individual' | 'organization' | 'household'
+          full_name: string
+          id_number: string | null
+          id_type: 'cccd' | 'cmnd' | 'passport' | 'tax_code' | null
+          phone: string | null
+          email: string | null
+          permanent_address: string | null
+          ownership_share: number | null
+          ownership_type: 'owner' | 'co_owner' | 'representative' | null
+          is_primary_contact: boolean
+          ownership_start_date: string | null
+          ownership_end_date: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          land_parcel_id: string
+          owner_type: 'individual' | 'organization' | 'household'
+          full_name: string
+          id_number?: string | null
+          id_type?: 'cccd' | 'cmnd' | 'passport' | 'tax_code' | null
+          phone?: string | null
+          email?: string | null
+          permanent_address?: string | null
+          ownership_share?: number | null
+          ownership_type?: 'owner' | 'co_owner' | 'representative' | null
+          is_primary_contact?: boolean
+          ownership_start_date?: string | null
+          ownership_end_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          land_parcel_id?: string
+          owner_type?: 'individual' | 'organization' | 'household'
+          full_name?: string
+          id_number?: string | null
+          id_type?: 'cccd' | 'cmnd' | 'passport' | 'tax_code' | null
+          phone?: string | null
+          email?: string | null
+          permanent_address?: string | null
+          ownership_share?: number | null
+          ownership_type?: 'owner' | 'co_owner' | 'representative' | null
+          is_primary_contact?: boolean
+          ownership_start_date?: string | null
+          ownership_end_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      land_parcel_uses: {
+        Row: {
+          id: string
+          land_parcel_id: string
+          land_use_type_code: string
+          land_use_purpose: string | null
+          area_m2: number
+          use_term_type: 'permanent' | 'limited' | null
+          use_start_date: string | null
+          use_end_date: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          land_parcel_id: string
+          land_use_type_code: string
+          land_use_purpose?: string | null
+          area_m2: number
+          use_term_type?: 'permanent' | 'limited' | null
+          use_start_date?: string | null
+          use_end_date?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          land_parcel_id?: string
+          land_use_type_code?: string
+          land_use_purpose?: string | null
+          area_m2?: number
+          use_term_type?: 'permanent' | 'limited' | null
+          use_start_date?: string | null
+          use_end_date?: string | null
+          notes?: string | null
+          created_at?: string
         }
       }
     }
@@ -504,4 +650,78 @@ export type WardUpdate = Database['public']['Tables']['wards']['Update']
 // Province with wards for dropdown/selection
 export interface ProvinceWithWards extends Province {
   wards: Ward[]
+}
+
+// Survey location types
+export type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
+export type SurveyLocationInsert = Database['public']['Tables']['survey_locations']['Insert']
+export type SurveyLocationUpdate = Database['public']['Tables']['survey_locations']['Update']
+
+// Land certificate types
+export type LandCertificate = Database['public']['Tables']['land_certificates']['Row']
+export type LandCertificateInsert = Database['public']['Tables']['land_certificates']['Insert']
+export type LandCertificateUpdate = Database['public']['Tables']['land_certificates']['Update']
+
+// Land parcel types
+export type LandParcel = Database['public']['Tables']['land_parcels']['Row']
+export type LandParcelInsert = Database['public']['Tables']['land_parcels']['Insert']
+export type LandParcelUpdate = Database['public']['Tables']['land_parcels']['Update']
+
+// Land parcel owner types
+export type LandParcelOwner = Database['public']['Tables']['land_parcel_owners']['Row']
+export type LandParcelOwnerInsert = Database['public']['Tables']['land_parcel_owners']['Insert']
+export type LandParcelOwnerUpdate = Database['public']['Tables']['land_parcel_owners']['Update']
+
+// Land parcel use types
+export type LandParcelUse = Database['public']['Tables']['land_parcel_uses']['Row']
+export type LandParcelUseInsert = Database['public']['Tables']['land_parcel_uses']['Insert']
+export type LandParcelUseUpdate = Database['public']['Tables']['land_parcel_uses']['Update']
+
+// Extended types with relationships
+export interface LandParcelWithDetails extends LandParcel {
+  certificate?: LandCertificate | null
+  owners: LandParcelOwner[]
+  land_uses: LandParcelUse[]
+}
+
+export interface SurveyLocationWithParcel extends SurveyLocation {
+  land_parcel?: LandParcelWithDetails | null
+  certificate?: LandCertificate | null
+}
+
+// Certificate API response type (for mock/real API)
+export interface CertificateAPIResponse {
+  certificate_number: string
+  certificate_book_number?: string
+  issue_date?: string
+  issuing_authority?: string
+  parcels: {
+    parcel_code: string
+    sheet_number?: string
+    parcel_number?: string
+    total_area_m2?: number
+    address?: string
+    province_id?: number
+    ward_id?: number
+    owners: {
+      full_name: string
+      id_number?: string
+      id_type?: 'cccd' | 'cmnd' | 'passport' | 'tax_code'
+      owner_type: 'individual' | 'organization' | 'household'
+      phone?: string
+      email?: string
+      permanent_address?: string
+      ownership_share?: number
+      ownership_type?: 'owner' | 'co_owner' | 'representative'
+      is_primary_contact?: boolean
+    }[]
+    land_uses: {
+      land_use_type_code: string
+      land_use_purpose?: string
+      area_m2: number
+      use_term_type?: 'permanent' | 'limited'
+      use_start_date?: string
+      use_end_date?: string
+    }[]
+  }[]
 }
