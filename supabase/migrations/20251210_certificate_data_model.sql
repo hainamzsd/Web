@@ -353,67 +353,67 @@ CREATE POLICY "Officers can manage parcel uses"
 -- Insert sample certificates
 INSERT INTO land_certificates (id, certificate_number, certificate_book_number, certificate_serial, issue_date, issuing_authority, province_id, ward_id, api_source)
 VALUES
-  ('c1000000-0000-0000-0000-000000000001', 'BV-123456', 'CS 00123', 'AX 123456', '2020-05-15', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26734, 'mock'),
-  ('c2000000-0000-0000-0000-000000000002', 'BV-234567', 'CS 00456', 'AX 234567', '2019-08-22', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26734, 'mock'),
-  ('c3000000-0000-0000-0000-000000000003', 'BV-345678', 'CS 00789', 'AX 345678', '2021-03-10', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26737, 'mock'),
-  ('c4000000-0000-0000-0000-000000000004', 'BV-456789', 'CS 01234', 'AX 456789', '2018-11-05', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26737, 'mock'),
-  ('c5000000-0000-0000-0000-000000000005', 'BV-567890', 'CS 05678', 'AX 567890', '2022-07-18', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26740, 'mock')
+  ('a1000000-0000-0000-0000-000000000001', 'BV-123456', 'CS 00123', 'AX 123456', '2020-05-15', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26734, 'mock'),
+  ('a2000000-0000-0000-0000-000000000002', 'BV-234567', 'CS 00456', 'AX 234567', '2019-08-22', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26734, 'mock'),
+  ('a3000000-0000-0000-0000-000000000003', 'BV-345678', 'CS 00789', 'AX 345678', '2021-03-10', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26737, 'mock'),
+  ('a4000000-0000-0000-0000-000000000004', 'BV-456789', 'CS 01234', 'AX 456789', '2018-11-05', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26737, 'mock'),
+  ('a5000000-0000-0000-0000-000000000005', 'BV-567890', 'CS 05678', 'AX 567890', '2022-07-18', 'Sở Tài nguyên và Môi trường tỉnh Bà Rịa - Vũng Tàu', 77, 26740, 'mock')
 ON CONFLICT (certificate_number) DO NOTHING;
 
 -- Insert sample land parcels
 INSERT INTO land_parcels (id, certificate_id, parcel_code, sheet_number, parcel_number, province_id, ward_id, address, total_area_m2, land_origin)
 VALUES
-  ('p1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', '77-26734-001', '15', '123', 77, 26734, '123 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 250.5, 'Nhà nước giao đất có thu tiền sử dụng đất'),
-  ('p2000000-0000-0000-0000-000000000002', 'c2000000-0000-0000-0000-000000000002', '77-26734-002', '15', '124', 77, 26734, '125 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 180.0, 'Nhận chuyển nhượng quyền sử dụng đất'),
-  ('p3000000-0000-0000-0000-000000000003', 'c3000000-0000-0000-0000-000000000003', '77-26737-001', '22', '456', 77, 26737, '45 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 320.0, 'Nhà nước giao đất không thu tiền sử dụng đất'),
-  ('p4000000-0000-0000-0000-000000000004', 'c4000000-0000-0000-0000-000000000004', '77-26737-002', '22', '457', 77, 26737, '47 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 450.0, 'Được Nhà nước cho thuê đất trả tiền hàng năm'),
-  ('p5000000-0000-0000-0000-000000000005', 'c5000000-0000-0000-0000-000000000005', '77-26740-001', '08', '789', 77, 26740, '89 Đường Nguyễn An Ninh, Phường 7, TP. Vũng Tàu', 520.0, 'Nhận thừa kế quyền sử dụng đất')
+  ('b1000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000001', '77-26734-001', '15', '123', 77, 26734, '123 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 250.5, 'Nhà nước giao đất có thu tiền sử dụng đất'),
+  ('b2000000-0000-0000-0000-000000000002', 'a2000000-0000-0000-0000-000000000002', '77-26734-002', '15', '124', 77, 26734, '125 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 180.0, 'Nhận chuyển nhượng quyền sử dụng đất'),
+  ('b3000000-0000-0000-0000-000000000003', 'a3000000-0000-0000-0000-000000000003', '77-26737-001', '22', '456', 77, 26737, '45 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 320.0, 'Nhà nước giao đất không thu tiền sử dụng đất'),
+  ('b4000000-0000-0000-0000-000000000004', 'a4000000-0000-0000-0000-000000000004', '77-26737-002', '22', '457', 77, 26737, '47 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 450.0, 'Được Nhà nước cho thuê đất trả tiền hàng năm'),
+  ('b5000000-0000-0000-0000-000000000005', 'a5000000-0000-0000-0000-000000000005', '77-26740-001', '08', '789', 77, 26740, '89 Đường Nguyễn An Ninh, Phường 7, TP. Vũng Tàu', 520.0, 'Nhận thừa kế quyền sử dụng đất')
 ON CONFLICT (certificate_id, parcel_code) DO NOTHING;
 
 -- Insert sample parcel owners (multiple owners per parcel)
 INSERT INTO land_parcel_owners (land_parcel_id, owner_type, full_name, id_number, id_type, id_issue_date, id_issue_place, date_of_birth, gender, phone, permanent_address, ownership_share, ownership_type, is_primary_contact)
 VALUES
   -- Parcel 1: Single owner
-  ('p1000000-0000-0000-0000-000000000001', 'individual', 'Nguyễn Văn An', '079085001234', 'cccd', '2021-01-15', 'Cục CS QLHC về TTXH', '1975-03-20', 'male', '0901234567', '123 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 100.00, 'owner', true),
+  ('b1000000-0000-0000-0000-000000000001', 'individual', 'Nguyễn Văn An', '079085001234', 'cccd', '2021-01-15', 'Cục CS QLHC về TTXH', '1975-03-20', 'male', '0901234567', '123 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 100.00, 'owner', true),
 
   -- Parcel 2: Couple (husband and wife)
-  ('p2000000-0000-0000-0000-000000000002', 'couple', 'Trần Văn Bình', '079080005678', 'cccd', '2020-06-10', 'Cục CS QLHC về TTXH', '1980-07-15', 'male', '0912345678', '125 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 50.00, 'owner', true),
-  ('p2000000-0000-0000-0000-000000000002', 'couple', 'Lê Thị Cúc', '079082009876', 'cccd', '2020-06-10', 'Cục CS QLHC về TTXH', '1982-12-25', 'female', '0923456789', '125 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 50.00, 'co_owner', false),
+  ('b2000000-0000-0000-0000-000000000002', 'couple', 'Trần Văn Bình', '079080005678', 'cccd', '2020-06-10', 'Cục CS QLHC về TTXH', '1980-07-15', 'male', '0912345678', '125 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 50.00, 'owner', true),
+  ('b2000000-0000-0000-0000-000000000002', 'couple', 'Lê Thị Cúc', '079082009876', 'cccd', '2020-06-10', 'Cục CS QLHC về TTXH', '1982-12-25', 'female', '0923456789', '125 Đường Trần Hưng Đạo, Phường 1, TP. Vũng Tàu', 50.00, 'co_owner', false),
 
   -- Parcel 3: Household with multiple members
-  ('p3000000-0000-0000-0000-000000000003', 'household', 'Phạm Văn Dũng', '079075003456', 'cccd', '2019-09-20', 'Cục CS QLHC về TTXH', '1970-01-10', 'male', '0934567890', '45 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 40.00, 'owner', true),
-  ('p3000000-0000-0000-0000-000000000003', 'household', 'Nguyễn Thị Em', '079078007890', 'cccd', '2019-09-20', 'Cục CS QLHC về TTXH', '1972-05-18', 'female', '0945678901', '45 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 30.00, 'co_owner', false),
-  ('p3000000-0000-0000-0000-000000000003', 'household', 'Phạm Văn Phúc', '079095004567', 'cccd', '2021-03-15', 'Cục CS QLHC về TTXH', '1995-08-22', 'male', '0956789012', '45 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 30.00, 'co_owner', false),
+  ('b3000000-0000-0000-0000-000000000003', 'household', 'Phạm Văn Dũng', '079075003456', 'cccd', '2019-09-20', 'Cục CS QLHC về TTXH', '1970-01-10', 'male', '0934567890', '45 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 40.00, 'owner', true),
+  ('b3000000-0000-0000-0000-000000000003', 'household', 'Nguyễn Thị Em', '079078007890', 'cccd', '2019-09-20', 'Cục CS QLHC về TTXH', '1972-05-18', 'female', '0945678901', '45 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 30.00, 'co_owner', false),
+  ('b3000000-0000-0000-0000-000000000003', 'household', 'Phạm Văn Phúc', '079095004567', 'cccd', '2021-03-15', 'Cục CS QLHC về TTXH', '1995-08-22', 'male', '0956789012', '45 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 30.00, 'co_owner', false),
 
   -- Parcel 4: Organization
-  ('p4000000-0000-0000-0000-000000000004', 'organization', 'Công ty TNHH Đầu tư Xây dựng Vũng Tàu', '3500123456', 'tax_code', '2015-04-01', 'Sở KH&ĐT tỉnh BR-VT', NULL, NULL, '02543123456', '47 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 100.00, 'owner', true),
+  ('b4000000-0000-0000-0000-000000000004', 'organization', 'Công ty TNHH Đầu tư Xây dựng Vũng Tàu', '3500123456', 'tax_code', '2015-04-01', 'Sở KH&ĐT tỉnh BR-VT', NULL, NULL, '02543123456', '47 Đường Lê Lợi, Phường 4, TP. Vũng Tàu', 100.00, 'owner', true),
 
   -- Parcel 5: Individual with representative
-  ('p5000000-0000-0000-0000-000000000005', 'individual', 'Hoàng Thị Giang', '079065008901', 'cccd', '2018-11-20', 'Cục CS QLHC về TTXH', '1965-04-12', 'female', '0967890123', '89 Đường Nguyễn An Ninh, Phường 7, TP. Vũng Tàu', 100.00, 'owner', false),
-  ('p5000000-0000-0000-0000-000000000005', 'individual', 'Hoàng Văn Hải', '079090002345', 'cccd', '2020-02-28', 'Cục CS QLHC về TTXH', '1990-09-30', 'male', '0978901234', '89 Đường Nguyễn An Ninh, Phường 7, TP. Vũng Tàu', 0.00, 'representative', true);
+  ('b5000000-0000-0000-0000-000000000005', 'individual', 'Hoàng Thị Giang', '079065008901', 'cccd', '2018-11-20', 'Cục CS QLHC về TTXH', '1965-04-12', 'female', '0967890123', '89 Đường Nguyễn An Ninh, Phường 7, TP. Vũng Tàu', 100.00, 'owner', false),
+  ('b5000000-0000-0000-0000-000000000005', 'individual', 'Hoàng Văn Hải', '079090002345', 'cccd', '2020-02-28', 'Cục CS QLHC về TTXH', '1990-09-30', 'male', '0978901234', '89 Đường Nguyễn An Ninh, Phường 7, TP. Vũng Tàu', 0.00, 'representative', true);
 
 -- Insert sample land uses (multiple uses per parcel)
 INSERT INTO land_parcel_uses (land_parcel_id, land_use_type_code, land_use_purpose, area_m2, use_term_type, use_start_date, use_end_date)
 VALUES
   -- Parcel 1: Residential only
-  ('p1000000-0000-0000-0000-000000000001', 'ODT', 'Đất ở tại đô thị', 250.5, 'stable', '2020-05-15', NULL),
+  ('b1000000-0000-0000-0000-000000000001', 'ODT', 'Đất ở tại đô thị', 250.5, 'stable', '2020-05-15', NULL),
 
   -- Parcel 2: Mixed use (residential + commercial)
-  ('p2000000-0000-0000-0000-000000000002', 'ODT', 'Đất ở tại đô thị', 120.0, 'stable', '2019-08-22', NULL),
-  ('p2000000-0000-0000-0000-000000000002', 'TMD', 'Đất thương mại, dịch vụ', 60.0, 'limited', '2019-08-22', '2069-08-22'),
+  ('b2000000-0000-0000-0000-000000000002', 'ODT', 'Đất ở tại đô thị', 120.0, 'stable', '2019-08-22', NULL),
+  ('b2000000-0000-0000-0000-000000000002', 'TMD', 'Đất thương mại, dịch vụ', 60.0, 'limited', '2019-08-22', '2069-08-22'),
 
   -- Parcel 3: Residential with garden
-  ('p3000000-0000-0000-0000-000000000003', 'ODT', 'Đất ở tại đô thị', 200.0, 'stable', '2021-03-10', NULL),
-  ('p3000000-0000-0000-0000-000000000003', 'CLN', 'Đất trồng cây lâu năm', 120.0, 'stable', '2021-03-10', NULL),
+  ('b3000000-0000-0000-0000-000000000003', 'ODT', 'Đất ở tại đô thị', 200.0, 'stable', '2021-03-10', NULL),
+  ('b3000000-0000-0000-0000-000000000003', 'CLN', 'Đất trồng cây lâu năm', 120.0, 'stable', '2021-03-10', NULL),
 
   -- Parcel 4: Commercial/Industrial
-  ('p4000000-0000-0000-0000-000000000004', 'SKC', 'Đất khu công nghiệp', 300.0, 'limited', '2018-11-05', '2068-11-05'),
-  ('p4000000-0000-0000-0000-000000000004', 'TMD', 'Đất thương mại, dịch vụ', 150.0, 'limited', '2018-11-05', '2068-11-05'),
+  ('b4000000-0000-0000-0000-000000000004', 'SKC', 'Đất khu công nghiệp', 300.0, 'limited', '2018-11-05', '2068-11-05'),
+  ('b4000000-0000-0000-0000-000000000004', 'TMD', 'Đất thương mại, dịch vụ', 150.0, 'limited', '2018-11-05', '2068-11-05'),
 
   -- Parcel 5: Large residential with multiple uses
-  ('p5000000-0000-0000-0000-000000000005', 'ODT', 'Đất ở tại đô thị', 300.0, 'stable', '2022-07-18', NULL),
-  ('p5000000-0000-0000-0000-000000000005', 'BHK', 'Đất xây dựng trụ sở cơ quan', 100.0, 'limited', '2022-07-18', '2072-07-18'),
-  ('p5000000-0000-0000-0000-000000000005', 'CLN', 'Đất trồng cây lâu năm', 120.0, 'stable', '2022-07-18', NULL);
+  ('b5000000-0000-0000-0000-000000000005', 'ODT', 'Đất ở tại đô thị', 300.0, 'stable', '2022-07-18', NULL),
+  ('b5000000-0000-0000-0000-000000000005', 'BHK', 'Đất xây dựng trụ sở cơ quan', 100.0, 'limited', '2022-07-18', '2072-07-18'),
+  ('b5000000-0000-0000-0000-000000000005', 'CLN', 'Đất trồng cây lâu năm', 120.0, 'stable', '2022-07-18', NULL);
 
 -- ============================================
 -- STEP 9: Add comment for documentation

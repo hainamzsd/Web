@@ -3,21 +3,23 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth/auth-context'
 import { createClient } from '@/lib/supabase/client'
-import { EnhancedSurveyMap } from '@/components/map/enhanced-survey-map'
+import { SurveyMapWrapper } from '@/components/map/survey-map-wrapper'
 import { Database } from '@/lib/types/database'
 import { Map, Search, BarChart3, Eye } from 'lucide-react'
+import { LocationIdentifierData } from '@/components/map/traffic-light-marker'
 
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
 export default function SupervisorMapPage() {
   const { webUser, loading: authLoading } = useAuth()
   const [surveys, setSurveys] = useState<SurveyLocation[]>([])
+  const [locationIdentifiers, setLocationIdentifiers] = useState<Record<string, LocationIdentifierData>>({})
   const [dataLoading, setDataLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const supabase = createClient()
 
   useEffect(() => {
-    async function fetchSurveys() {
+    async function fetchData() {
       if (authLoading) return
 
       if (!webUser) {
@@ -42,14 +44,35 @@ export default function SupervisorMapPage() {
 
         if (error) throw error
         setSurveys((data || []) as any)
+
+        // Fetch location identifiers for these surveys
+        if (data && data.length > 0) {
+          const surveyIds = data.map(s => s.id)
+          const { data: locIds, error: locError } = await supabase
+            .from('location_identifiers')
+            .select('survey_location_id, location_id, is_active, deactivation_reason')
+            .in('survey_location_id', surveyIds)
+
+          if (!locError && locIds) {
+            const locIdMap: Record<string, LocationIdentifierData> = {}
+            for (const locId of locIds) {
+              locIdMap[locId.survey_location_id] = {
+                location_id: locId.location_id,
+                is_active: locId.is_active,
+                deactivation_reason: locId.deactivation_reason
+              }
+            }
+            setLocationIdentifiers(locIdMap)
+          }
+        }
       } catch (error) {
-        console.error('Error fetching surveys:', error)
+        console.error('Error fetching data:', error)
       } finally {
         setDataLoading(false)
       }
     }
 
-    fetchSurveys()
+    fetchData()
   }, [webUser, authLoading])
 
   const loading = authLoading || dataLoading
@@ -73,6 +96,8 @@ export default function SupervisorMapPage() {
         if (statusFilter === 'reviewed') return s.status === 'reviewed'
         if (statusFilter === 'approved') return s.status === 'approved_commune' || s.status === 'approved_central' || s.status === 'published'
         if (statusFilter === 'rejected') return s.status === 'rejected'
+        // Filter surveys that have location identifiers (from location_identifiers table)
+        if (statusFilter === 'has_id') return !!locationIdentifiers[s.id]
         return true
       })
 
@@ -84,6 +109,8 @@ export default function SupervisorMapPage() {
   const approvedCount = (statusCounts['approved_commune'] || 0) +
     (statusCounts['approved_central'] || 0) +
     (statusCounts['published'] || 0)
+
+  const withIdCount = Object.keys(locationIdentifiers).length
 
   return (
     <div className="flex flex-col -m-6" style={{ height: 'calc(100vh - 56px)' }}>
@@ -136,14 +163,22 @@ export default function SupervisorMapPage() {
               >
                 Duyệt ({approvedCount})
               </button>
+              <button
+                onClick={() => setStatusFilter('has_id')}
+                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  statusFilter === 'has_id' ? 'bg-purple-500 text-white' : 'text-slate-300 hover:bg-slate-600/50'
+                }`}
+              >
+                Có mã ({withIdCount})
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Full Height Map */}
+      {/* Full Height Map with 2D/3D Toggle */}
       <div className="flex-1 relative min-h-0">
-        <EnhancedSurveyMap
+        <SurveyMapWrapper
           surveys={filteredSurveys}
           showClustering={false}
           showHeatmap={false}
@@ -151,6 +186,9 @@ export default function SupervisorMapPage() {
           height="100%"
           showSearch={true}
           baseDetailUrl="/supervisor/reviews"
+          locationIdentifiers={locationIdentifiers}
+          showModeToggle={true}
+          defaultMode="2d"
         />
       </div>
     </div>

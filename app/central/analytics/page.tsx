@@ -71,9 +71,9 @@ export default function AnalyticsPage() {
 
         // Calculate metrics
         const total = surveys.length
-        const completed = surveys.filter(s => s.status === 'published').length
+        const completed = surveys.filter(s => (s.status as string) === 'published').length
         const approved = surveys.filter(s =>
-          s.status === 'approved_central' || s.status === 'published'
+          (s.status as string) === 'approved_central' || (s.status as string) === 'published'
         ).length
 
         const thisMonthCount = surveys.filter(s =>
@@ -91,7 +91,7 @@ export default function AnalyticsPage() {
 
         // Calculate average processing time (in hours)
         const processedSurveys = surveys.filter(s =>
-          s.status === 'published' && s.updated_at && s.created_at
+          (s.status as string) === 'published' && s.updated_at && s.created_at
         )
 
         const avgTime = processedSurveys.length > 0
@@ -116,7 +116,7 @@ export default function AnalyticsPage() {
             month: monthStart.toLocaleDateString('vi-VN', { month: 'short', year: '2-digit' }),
             surveys: monthSurveys.length,
             approved: monthSurveys.filter(s =>
-              s.status === 'approved_central' || s.status === 'published'
+              (s.status as string) === 'approved_central' || (s.status as string) === 'published'
             ).length,
           }
         })
@@ -127,7 +127,7 @@ export default function AnalyticsPage() {
           const provinceCode = survey.province_code?.substring(0, 2) || 'Unknown'
           const existing = provinceMap.get(provinceCode) || { total: 0, approved: 0 }
           existing.total++
-          if (survey.status === 'approved_central' || survey.status === 'published') {
+          if ((survey.status as string) === 'approved_central' || (survey.status as string) === 'published') {
             existing.approved++
           }
           provinceMap.set(provinceCode, existing)

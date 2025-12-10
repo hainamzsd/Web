@@ -292,29 +292,26 @@ export default function ReviewDetailPage() {
               )}
             </div>
 
-            {survey.land_area_m2 && (
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-600 mb-1">Diện tích</p>
-                <p className="text-lg font-semibold text-blue-900">{survey.land_area_m2.toLocaleString('vi-VN')} m²</p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Owner Info */}
+        {/* Representative Contact Info */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <User className="h-4 w-4 text-green-600" />
-              Thông tin chủ sở hữu
+              Người liên hệ khi khảo sát
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <p className="text-xs text-gray-500 italic">
+              Thông tin liên hệ ghi nhận tại hiện trường (không phải chủ sở hữu chính thức)
+            </p>
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <User className="h-5 w-5 text-gray-400" />
               <div>
                 <p className="text-xs text-gray-500">Họ tên</p>
-                <p className="text-sm font-medium">{survey.owner_name || '-'}</p>
+                <p className="text-sm font-medium">{(survey as any).representative_name || '-'}</p>
               </div>
             </div>
 
@@ -322,7 +319,7 @@ export default function ReviewDetailPage() {
               <CreditCard className="h-5 w-5 text-gray-400" />
               <div>
                 <p className="text-xs text-gray-500">CMND/CCCD</p>
-                <p className="text-sm font-medium">{survey.owner_id_number || '-'}</p>
+                <p className="text-sm font-medium">{(survey as any).representative_id_number || '-'}</p>
               </div>
             </div>
 
@@ -330,7 +327,7 @@ export default function ReviewDetailPage() {
               <Phone className="h-5 w-5 text-gray-400" />
               <div>
                 <p className="text-xs text-gray-500">Số điện thoại</p>
-                <p className="text-sm font-medium">{survey.owner_phone || '-'}</p>
+                <p className="text-sm font-medium">{(survey as any).representative_phone || '-'}</p>
               </div>
             </div>
 

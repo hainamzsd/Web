@@ -1,86 +1,98 @@
 [
   {
     "table_name": "approval_history",
-    "columns": "id, survey_location_id, action, actor_id, actor_role, previous_status, new_status, notes, metadata, created_at"
+    "columns": "id (uuid), survey_location_id (uuid), action (text), actor_id (uuid), actor_role (text), previous_status (text), new_status (text), notes (text), metadata (jsonb), created_at (timestamp with time zone)"
   },
   {
     "table_name": "audit_logs",
-    "columns": "id, user_id, action, resource_type, resource_id, ip_address, user_agent, changes, created_at"
+    "columns": "id (uuid), user_id (uuid), action (text), resource_type (text), resource_id (uuid), ip_address (inet), user_agent (text), changes (jsonb), created_at (timestamp with time zone)"
   },
   {
     "table_name": "geography_columns",
-    "columns": "f_table_catalog, f_table_schema, f_table_name, f_geography_column, coord_dimension, srid, type"
+    "columns": "f_table_catalog (name), f_table_schema (name), f_table_name (name), f_geography_column (name), coord_dimension (integer), srid (integer), type (text)"
   },
   {
     "table_name": "geometry_columns",
-    "columns": "f_table_catalog, f_table_schema, f_table_name, f_geometry_column, coord_dimension, srid, type"
+    "columns": "f_table_catalog (character varying), f_table_schema (name), f_table_name (name), f_geometry_column (name), coord_dimension (integer), srid (integer), type (character varying)"
+  },
+  {
+    "table_name": "land_certificates",
+    "columns": "id (uuid), certificate_number (text), certificate_book_number (text), certificate_serial (text), issue_date (date), issuing_authority (text), province_id (integer), ward_id (integer), is_active (boolean), deactivated_at (timestamp with time zone), deactivation_reason (text), fetched_from_api_at (timestamp with time zone), api_source (text), api_response_data (jsonb), created_at (timestamp with time zone), updated_at (timestamp with time zone)"
+  },
+  {
+    "table_name": "land_parcel_owners",
+    "columns": "id (uuid), land_parcel_id (uuid), owner_type (text), full_name (text), id_number (text), id_type (text), id_issue_date (date), id_issue_place (text), date_of_birth (date), gender (text), nationality (text), phone (text), email (text), permanent_address (text), ownership_share (numeric), ownership_type (text), is_primary_contact (boolean), ownership_start_date (date), ownership_end_date (date), notes (text), created_at (timestamp with time zone), updated_at (timestamp with time zone)"
+  },
+  {
+    "table_name": "land_parcel_uses",
+    "columns": "id (uuid), land_parcel_id (uuid), land_use_type_code (text), land_use_purpose (text), area_m2 (numeric), use_term_type (text), use_start_date (date), use_end_date (date), use_restrictions (text), notes (text), created_at (timestamp with time zone)"
   },
   {
     "table_name": "land_parcels",
-    "columns": "id, parcel_code, owner_name, owner_id_number, owner_phone, land_use_certificate_number, parcel_area_m2, land_use_type_code, geometry, created_at, updated_at, province_id, ward_id"
+    "columns": "id (uuid), certificate_id (uuid), parcel_code (text), sheet_number (text), parcel_number (text), province_id (integer), ward_id (integer), address (text), total_area_m2 (numeric), geometry (USER-DEFINED), land_origin (text), legal_status (text), created_at (timestamp with time zone), updated_at (timestamp with time zone)"
   },
   {
-    "table_name": "land_parcels_with_location",
-    "columns": "id, parcel_code, owner_name, owner_id_number, owner_phone, land_use_certificate_number, parcel_area_m2, land_use_type_code, geometry, created_at, updated_at, province_id, ward_id, province_code, province_name, ward_code, ward_name"
+    "table_name": "land_parcels_with_details",
+    "columns": "id (uuid), certificate_id (uuid), parcel_code (text), sheet_number (text), parcel_number (text), province_id (integer), ward_id (integer), address (text), total_area_m2 (numeric), geometry (USER-DEFINED), land_origin (text), legal_status (text), created_at (timestamp with time zone), updated_at (timestamp with time zone), certificate_number (text), certificate_issue_date (date), issuing_authority (text), province_name (text), ward_name (text), owners (json), land_uses (json)"
   },
   {
     "table_name": "location_identifiers",
-    "columns": "id, survey_location_id, location_id, admin_code, sequence_number, assigned_by, assigned_at, is_active, deactivated_at, deactivated_by, deactivation_reason"
+    "columns": "id (uuid), survey_location_id (uuid), location_id (text), admin_code (text), sequence_number (text), assigned_by (uuid), assigned_at (timestamp with time zone), is_active (boolean), deactivated_at (timestamp with time zone), deactivated_by (uuid), deactivation_reason (text)"
   },
   {
     "table_name": "profiles",
-    "columns": "id, full_name, phone, police_id, unit, avatar_url, created_at, updated_at, role, province_id, ward_id"
+    "columns": "id (uuid), full_name (text), phone (text), police_id (text), unit (text), avatar_url (text), created_at (timestamp with time zone), updated_at (timestamp with time zone), role (text), province_id (integer), ward_id (integer)"
   },
   {
     "table_name": "profiles_with_location",
-    "columns": "id, full_name, phone, police_id, unit, avatar_url, created_at, updated_at, role, province_id, ward_id, province_code, province_name, ward_code, ward_name"
+    "columns": "id (uuid), full_name (text), phone (text), police_id (text), unit (text), avatar_url (text), created_at (timestamp with time zone), updated_at (timestamp with time zone), role (text), province_id (integer), ward_id (integer), province_code (integer), province_name (text), ward_code (integer), ward_name (text)"
   },
   {
     "table_name": "provinces",
-    "columns": "code, name, codename, division_type, phone_code, created_at, updated_at"
+    "columns": "code (integer), name (text), codename (text), division_type (text), phone_code (integer), created_at (timestamp with time zone), updated_at (timestamp with time zone)"
   },
   {
     "table_name": "spatial_ref_sys",
-    "columns": "srid, auth_name, auth_srid, srtext, proj4text"
+    "columns": "srid (integer), auth_name (character varying), auth_srid (integer), srtext (character varying), proj4text (character varying)"
   },
   {
     "table_name": "survey_entry_points",
-    "columns": "id, survey_location_id, sequence_number, latitude, longitude, elevation, gps_point, house_number, street, address_full, entry_type, is_primary, facing_direction, notes, created_at, updated_at"
+    "columns": "id (uuid), survey_location_id (uuid), sequence_number (integer), latitude (numeric), longitude (numeric), elevation (numeric), gps_point (USER-DEFINED), house_number (text), street (text), address_full (text), entry_type (text), is_primary (boolean), facing_direction (text), notes (text), created_at (timestamp with time zone), updated_at (timestamp with time zone)"
   },
   {
     "table_name": "survey_locations",
-    "columns": "id, surveyor_id, location_name, address, house_number, street, hamlet, latitude, longitude, accuracy, polygon_geometry, object_type, land_use_type, owner_name, owner_id_number, owner_phone, parcel_code, land_area_m2, photos, notes, status, location_identifier, created_at, updated_at, gps_point, rough_area, has_rough_area, gps_accuracy_m, gps_source, mission_id, assigned_to, client_local_id, synced_at, submitted_at, final_location_id, province_id, ward_id, entry_points"
+    "columns": "id (uuid), surveyor_id (uuid), location_name (text), address (text), house_number (text), street (text), hamlet (text), latitude (numeric), longitude (numeric), accuracy (numeric), polygon_geometry (jsonb), object_type (text), land_use_type (text), representative_name (text), representative_id_number (text), representative_phone (text), parcel_code (text), land_area_m2 (numeric), photos (ARRAY), notes (text), status (text), location_identifier (text), created_at (timestamp with time zone), updated_at (timestamp with time zone), gps_point (USER-DEFINED), rough_area (USER-DEFINED), has_rough_area (boolean), gps_accuracy_m (real), gps_source (text), mission_id (uuid), assigned_to (uuid), client_local_id (text), synced_at (timestamp with time zone), submitted_at (timestamp with time zone), final_location_id (text), province_id (integer), ward_id (integer), entry_points (jsonb), land_parcel_id (uuid), certificate_id (uuid), parcel_verified_at (timestamp with time zone), parcel_verified_by (uuid)"
   },
   {
     "table_name": "survey_locations_with_location",
-    "columns": "id, surveyor_id, location_name, address, house_number, street, hamlet, latitude, longitude, accuracy, polygon_geometry, object_type, land_use_type, owner_name, owner_id_number, owner_phone, parcel_code, land_area_m2, photos, notes, status, location_identifier, created_at, updated_at, gps_point, rough_area, has_rough_area, gps_accuracy_m, gps_source, mission_id, assigned_to, client_local_id, synced_at, submitted_at, final_location_id, province_id, ward_id, province_code, province_name, province_codename, ward_code, ward_name, ward_codename"
+    "columns": "id (uuid), surveyor_id (uuid), location_name (text), address (text), house_number (text), street (text), hamlet (text), latitude (numeric), longitude (numeric), accuracy (numeric), polygon_geometry (jsonb), object_type (text), land_use_type (text), owner_name (text), owner_id_number (text), owner_phone (text), parcel_code (text), land_area_m2 (numeric), photos (ARRAY), notes (text), status (text), location_identifier (text), created_at (timestamp with time zone), updated_at (timestamp with time zone), gps_point (USER-DEFINED), rough_area (USER-DEFINED), has_rough_area (boolean), gps_accuracy_m (real), gps_source (text), mission_id (uuid), assigned_to (uuid), client_local_id (text), synced_at (timestamp with time zone), submitted_at (timestamp with time zone), final_location_id (text), province_id (integer), ward_id (integer), province_code (integer), province_name (text), province_codename (text), ward_code (integer), ward_name (text), ward_codename (text)"
   },
   {
     "table_name": "survey_media",
-    "columns": "id, survey_location_id, media_type, file_path, thumbnail_path, captured_at, note, gps_point, created_at"
+    "columns": "id (uuid), survey_location_id (uuid), media_type (text), file_path (text), thumbnail_path (text), captured_at (timestamp with time zone), note (text), gps_point (USER-DEFINED), created_at (timestamp with time zone)"
   },
   {
     "table_name": "survey_vertices",
-    "columns": "id, survey_location_id, seq, lat, lng, created_at"
+    "columns": "id (uuid), survey_location_id (uuid), seq (integer), lat (double precision), lng (double precision), created_at (timestamp with time zone)"
   },
   {
     "table_name": "sync_events",
-    "columns": "id, profile_id, device_id, event_type, payload, created_at"
+    "columns": "id (uuid), profile_id (uuid), device_id (text), event_type (text), payload (jsonb), created_at (timestamp with time zone)"
   },
   {
     "table_name": "system_config",
-    "columns": "key, value, description, updated_by, updated_at"
+    "columns": "key (text), value (jsonb), description (text), updated_by (uuid), updated_at (timestamp with time zone)"
   },
   {
     "table_name": "wards",
-    "columns": "code, name, codename, division_type, province_code, created_at, updated_at"
+    "columns": "code (integer), name (text), codename (text), division_type (text), province_code (integer), created_at (timestamp with time zone), updated_at (timestamp with time zone)"
   },
   {
     "table_name": "web_users",
-    "columns": "id, profile_id, role, permissions, is_active, last_login, created_at, updated_at, province_id, ward_id"
+    "columns": "id (uuid), profile_id (uuid), role (text), permissions (jsonb), is_active (boolean), last_login (timestamp with time zone), created_at (timestamp with time zone), updated_at (timestamp with time zone), province_id (integer), ward_id (integer)"
   },
   {
     "table_name": "web_users_with_location",
-    "columns": "id, profile_id, role, permissions, is_active, last_login, created_at, updated_at, province_id, ward_id, full_name, phone, police_id, province_code, province_name, ward_code, ward_name"
+    "columns": "id (uuid), profile_id (uuid), role (text), permissions (jsonb), is_active (boolean), last_login (timestamp with time zone), created_at (timestamp with time zone), updated_at (timestamp with time zone), province_id (integer), ward_id (integer), full_name (text), phone (text), police_id (text), province_code (integer), province_name (text), ward_code (integer), ward_name (text)"
   }
 ]

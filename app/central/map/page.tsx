@@ -3,21 +3,23 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth/auth-context'
 import { createClient } from '@/lib/supabase/client'
-import { EnhancedSurveyMap } from '@/components/map/enhanced-survey-map'
+import { SurveyMapWrapper } from '@/components/map/survey-map-wrapper'
 import { Database } from '@/lib/types/database'
 import { Map, Globe, Filter } from 'lucide-react'
+import { LocationIdentifierData } from '@/components/map/traffic-light-marker'
 
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
 export default function CentralMapPage() {
   const { webUser, loading: authLoading } = useAuth()
   const [surveys, setSurveys] = useState<SurveyLocation[]>([])
+  const [locationIdentifiers, setLocationIdentifiers] = useState<Record<string, LocationIdentifierData>>({})
   const [dataLoading, setDataLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const supabase = createClient()
 
   useEffect(() => {
-    async function fetchSurveys() {
+    async function fetchData() {
       if (authLoading) return
 
       if (!webUser) {
@@ -26,24 +28,42 @@ export default function CentralMapPage() {
       }
 
       try {
-        // Central admin can see all surveys
-        let query = supabase
-          .from('survey_locations')
-          .select('*')
-          .order('created_at', { ascending: false })
+        // Fetch surveys and location identifiers in parallel
+        const [surveysResult, locationIdsResult] = await Promise.all([
+          // Central admin can see all surveys
+          supabase
+            .from('survey_locations')
+            .select('*')
+            .order('created_at', { ascending: false }),
+          // Fetch all location identifiers
+          supabase
+            .from('location_identifiers')
+            .select('survey_location_id, location_id, is_active, deactivation_reason')
+        ])
 
-        const { data, error } = await query
+        if (surveysResult.error) throw surveysResult.error
+        if (locationIdsResult.error) throw locationIdsResult.error
 
-        if (error) throw error
-        setSurveys((data || []) as any)
+        setSurveys((surveysResult.data || []) as any)
+
+        // Convert location identifiers to a map keyed by survey_location_id
+        const locIdMap: Record<string, LocationIdentifierData> = {}
+        for (const locId of locationIdsResult.data || []) {
+          locIdMap[locId.survey_location_id] = {
+            location_id: locId.location_id,
+            is_active: locId.is_active,
+            deactivation_reason: locId.deactivation_reason
+          }
+        }
+        setLocationIdentifiers(locIdMap)
       } catch (error) {
-        console.error('Error fetching surveys:', error)
+        console.error('Error fetching data:', error)
       } finally {
         setDataLoading(false)
       }
     }
 
-    fetchSurveys()
+    fetchData()
   }, [webUser, authLoading])
 
   const loading = authLoading || dataLoading
@@ -66,7 +86,8 @@ export default function CentralMapPage() {
         if (statusFilter === 'pending') return s.status === 'pending' || s.status === 'reviewed'
         if (statusFilter === 'approved') return s.status === 'approved_commune' || s.status === 'approved_central' || s.status === 'published'
         if (statusFilter === 'rejected') return s.status === 'rejected'
-        if (statusFilter === 'has_id') return !!s.location_identifier
+        // Filter surveys that have location identifiers (from location_identifiers table)
+        if (statusFilter === 'has_id') return !!locationIdentifiers[s.id]
         return true
       })
 
@@ -81,7 +102,8 @@ export default function CentralMapPage() {
 
   const pendingCount = (statusCounts['pending'] || 0) + (statusCounts['reviewed'] || 0)
 
-  const withIdCount = surveys.filter(s => s.location_identifier).length
+  // Count surveys that have location identifiers from the location_identifiers table
+  const withIdCount = Object.keys(locationIdentifiers).length
 
   return (
     <div className="flex flex-col -m-6" style={{ height: 'calc(100vh - 56px)' }}>
@@ -139,9 +161,9 @@ export default function CentralMapPage() {
         </div>
       </div>
 
-      {/* Full Height Map */}
+      {/* Full Height Map with 2D/3D Toggle */}
       <div className="flex-1 relative min-h-0">
-        <EnhancedSurveyMap
+        <SurveyMapWrapper
           surveys={filteredSurveys}
           showClustering={filteredSurveys.length > 100}
           showHeatmap={false}
@@ -149,6 +171,9 @@ export default function CentralMapPage() {
           height="100%"
           showSearch={true}
           baseDetailUrl="/central/surveys"
+          locationIdentifiers={locationIdentifiers}
+          showModeToggle={true}
+          defaultMode="2d"
         />
       </div>
     </div>

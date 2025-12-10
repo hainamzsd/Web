@@ -17,7 +17,10 @@
       "Bash(taskkill:*)",
       "Bash(set NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co)",
       "Bash(set:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(cat:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

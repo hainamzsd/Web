@@ -4,13 +4,19 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { Database } from '@/lib/types/database'
 import { EntryPoint, ENTRY_TYPE_LABELS } from '@/lib/types/entry-points'
-import { X, MapPin, User, Ruler, Navigation, Calendar, ExternalLink, Search, ArrowRight, Tag, Building } from 'lucide-react'
+import { X, MapPin, User, Ruler, Navigation, Calendar, ExternalLink, Search, ArrowRight, Tag, Building, TrafficCone } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet-draw/dist/leaflet.draw.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
+import { createTrafficLightIcon, createTrafficLightPopup, getTrafficLightStatus, LocationIdentifierData } from './traffic-light-marker'
 
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
+
+// Extended survey type with location identifier data for traffic lights
+export interface SurveyWithLocationId extends SurveyLocation {
+  location_identifier_data?: LocationIdentifierData | null
+}
 
 interface EnhancedSurveyMapProps {
   surveys: SurveyLocation[]
@@ -27,6 +33,8 @@ interface EnhancedSurveyMapProps {
   height?: string
   showSearch?: boolean
   baseDetailUrl?: string
+  /** Location identifiers data for traffic light mode. Key is survey_location_id */
+  locationIdentifiers?: Record<string, LocationIdentifierData>
 }
 
 function EnhancedSurveyMapComponent({
@@ -43,7 +51,8 @@ function EnhancedSurveyMapComponent({
   showInfoCard = true,
   height = '600px',
   showSearch = true,
-  baseDetailUrl = '/commune/surveys'
+  baseDetailUrl = '/commune/surveys',
+  locationIdentifiers = {}
 }: EnhancedSurveyMapProps) {
   const mapRef = useRef<any>(null)
   const leafletRef = useRef<any>(null)
@@ -53,7 +62,8 @@ function EnhancedSurveyMapComponent({
   const drawnItemsRef = useRef<any>(null)
   const polygonLayerRef = useRef<any>(null)
   const entryPointsLayerRef = useRef<any>(null)
-  const [mapMode, setMapMode] = useState<'markers' | 'heatmap' | 'clusters'>('markers')
+  const trafficLightLayerRef = useRef<any>(null)
+  const [mapMode, setMapMode] = useState<'markers' | 'heatmap' | 'clusters' | 'trafficLights'>('markers')
   const [mapId] = useState(`enhanced-map-${Math.random().toString(36).substr(2, 9)}`)
   const [isMapReady, setIsMapReady] = useState(false)
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyLocation | null>(null)
@@ -449,6 +459,10 @@ function EnhancedSurveyMapComponent({
       mapRef.current.removeLayer(heatmapLayerRef.current)
       heatmapLayerRef.current = null
     }
+    if (trafficLightLayerRef.current) {
+      mapRef.current.removeLayer(trafficLightLayerRef.current)
+      trafficLightLayerRef.current = null
+    }
 
     const validSurveys = surveys.filter(s => s.latitude && s.longitude)
 
@@ -545,8 +559,86 @@ function EnhancedSurveyMapComponent({
 
         mapRef.current?.addLayer(markers)
         markerLayerRef.current = markers
+      } else if (mapMode === 'trafficLights') {
+        // Traffic Light mode - ONLY shows surveys with location_identifiers
+        // These are surveys with status 'approved_central' that have been assigned a location ID
+        const trafficLightLayer = L.layerGroup()
+
+        // Filter surveys that have location identifiers
+        const surveysWithLocationId = validSurveys.filter(survey => {
+          const locationId = survey.location_identifier || survey.final_location_id
+          return locationId && locationIdentifiers[survey.id]
+        })
+
+        if (surveysWithLocationId.length === 0) {
+          // Show message if no surveys with location identifiers
+          console.log('No surveys with location identifiers found for traffic light display')
+        }
+
+        surveysWithLocationId.forEach(survey => {
+          const locationIdData = locationIdentifiers[survey.id]
+          if (!locationIdData) return
+
+          const locationId = locationIdData.location_id
+          const isActive = locationIdData.is_active
+          const lightStatus = getTrafficLightStatus(isActive)
+
+          // Create traffic light icon
+          const icon = L.divIcon({
+            className: 'traffic-light-marker',
+            html: createTrafficLightIcon({
+              status: lightStatus,
+              locationId: locationId,
+              pulseAnimation: true
+            }),
+            iconSize: [40, 95],
+            iconAnchor: [20, 75],
+            popupAnchor: [0, -55],
+          })
+
+          const marker = L.marker([survey.latitude!, survey.longitude!], { icon })
+
+          // Create popup content with location identifier data
+          const popupContent = createTrafficLightPopup(
+            survey.location_name || 'Chưa đặt tên',
+            survey.address || '',
+            locationId,
+            isActive,
+            locationIdData.deactivation_reason || null,
+            `${baseDetailUrl}/${survey.id}`
+          )
+
+          marker.bindPopup(popupContent, {
+            maxWidth: 300,
+            className: 'traffic-light-popup'
+          })
+
+          marker.on('click', () => {
+            setSelectedSurvey(survey)
+            if (onSurveySelect) {
+              onSurveySelect(survey)
+            }
+            if (mapRef.current) {
+              mapRef.current.flyTo([survey.latitude!, survey.longitude!], 17, {
+                duration: 1.2,
+                easeLinearity: 0.25
+              })
+            }
+          })
+
+          trafficLightLayer.addLayer(marker)
+        })
+
+        trafficLightLayer.addTo(mapRef.current)
+        trafficLightLayerRef.current = trafficLightLayer
+
+        // Fit bounds only if no survey is selected and we have traffic lights
+        if (!selectedSurvey && surveysWithLocationId.length > 0) {
+          const bounds = L.latLngBounds(surveysWithLocationId.map(s => [s.latitude!, s.longitude!]))
+          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 })
+        }
       } else {
-        // Regular markers mode
+        // Regular markers mode (default)
         const markerLayer = L.layerGroup()
 
         validSurveys.forEach(survey => {
@@ -630,7 +722,7 @@ function EnhancedSurveyMapComponent({
     }
 
     updateMarkers()
-  }, [surveys, mapMode, showHeatmap, showClustering, selectedSurveyId, isMapReady, baseDetailUrl])
+  }, [surveys, mapMode, showHeatmap, showClustering, selectedSurveyId, isMapReady, baseDetailUrl, locationIdentifiers])
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -785,37 +877,77 @@ function EnhancedSurveyMapComponent({
         >
           Bản đồ nhiệt
         </button>
+        <div className="border-t border-gray-200 my-1"></div>
+        <button
+          onClick={() => setMapMode('trafficLights')}
+          className={`w-full px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2 ${mapMode === 'trafficLights'
+            ? 'bg-gradient-to-r from-red-500 to-green-500 text-white'
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+        >
+          <TrafficCone className="h-4 w-4" />
+          Mã định danh
+        </button>
       </div>
 
       {/* Legend - Bottom Right */}
       <div className="absolute bottom-3 right-3 z-[1000] bg-white rounded-lg shadow-lg p-3 max-h-[200px] overflow-y-auto">
-        <h4 className="font-semibold text-sm mb-2">Trạng thái khảo sát</h4>
-        <div className="space-y-1 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-            <span>Chờ xử lý</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-sky-500"></div>
-            <span>Đã xem xét</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-            <span>Đã duyệt xã</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            <span>Đã duyệt TW</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span>Đã công bố</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <span>Từ chối</span>
-          </div>
-        </div>
+        {mapMode === 'trafficLights' ? (
+          <>
+            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+              <TrafficCone className="h-4 w-4" />
+              Trạng thái mã định danh
+            </h4>
+            <p className="text-[10px] text-gray-500 mb-2">Chỉ hiển thị vị trí đã được cấp mã</p>
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-3 p-1.5 bg-green-50 rounded">
+                <div className="w-4 h-4 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                <div>
+                  <span className="font-medium text-green-700">Xanh</span>
+                  <p className="text-green-600 text-[10px]">Đang hoạt động</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-1.5 bg-red-50 rounded">
+                <div className="w-4 h-4 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
+                <div>
+                  <span className="font-medium text-red-700">Đỏ</span>
+                  <p className="text-red-600 text-[10px]">Đã vô hiệu hóa</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2 italic">Mã định danh hiển thị dưới đèn</p>
+          </>
+        ) : (
+          <>
+            <h4 className="font-semibold text-sm mb-2">Trạng thái khảo sát</h4>
+            <div className="space-y-1 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                <span>Chờ xử lý</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-sky-500"></div>
+                <span>Đã xem xét</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                <span>Đã duyệt xã</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span>Đã duyệt TW</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span>Đã công bố</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <span>Từ chối</span>
+              </div>
+            </div>
+          </>
+        )}
         {entryPoints.length > 0 && (
           <>
             <hr className="my-2 border-gray-200" />

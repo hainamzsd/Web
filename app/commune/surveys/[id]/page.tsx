@@ -431,6 +431,7 @@ export default function SurveyDetailPage() {
   }
 
   const loading = authLoading || dataLoading
+  const isReadOnly = survey?.status !== 'pending'
 
   if (loading) {
     return (
@@ -490,20 +491,25 @@ export default function SurveyDetailPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleSave} disabled={saving} variant="outline" className="gap-2">
-              <Save className="h-4 w-4" />
-              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-            </Button>
-            {survey.status === 'pending' && (
-              <Button onClick={handleSubmitForReview} disabled={saving} className="gap-2 bg-green-600 hover:bg-green-700">
-                <Send className="h-4 w-4" />
-                {saving ? 'Đang gửi...' : 'Gửi lên cấp trên'}
-              </Button>
+            {!isReadOnly && (
+              <>
+                <Button onClick={handleSave} disabled={saving} variant="outline" className="gap-2">
+                  <Save className="h-4 w-4" />
+                  {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </Button>
+                <Button onClick={handleSubmitForReview} disabled={saving} className="gap-2 bg-green-600 hover:bg-green-700">
+                  <Send className="h-4 w-4" />
+                  {saving ? 'Đang gửi...' : 'Gửi lên cấp trên'}
+                </Button>
+              </>
             )}
-            {survey.status === 'reviewed' && (
+            {isReadOnly && (
               <span className="flex items-center gap-2 px-4 py-2 bg-sky-100 text-sky-700 rounded-md text-sm font-medium">
                 <Send className="h-4 w-4" />
-                Đã gửi xem xét
+                {survey.status === 'reviewed' ? 'Đã gửi xem xét' :
+                 survey.status === 'approved_commune' ? 'Đã duyệt cấp xã' :
+                 survey.status === 'approved_central' ? 'Đã duyệt cấp TW' :
+                 survey.status === 'rejected' ? 'Đã từ chối' : survey.status}
               </span>
             )}
           </div>
@@ -521,8 +527,8 @@ export default function SurveyDetailPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
             >
               <tab.icon className="h-4 w-4" />
@@ -536,23 +542,7 @@ export default function SurveyDetailPage() {
       {activeTab === 'info' && (
         <div className="space-y-6">
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-600 rounded-lg">
-                    <Ruler className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-blue-600 font-medium">Diện tích</p>
-                    <p className="text-lg font-bold text-blue-900">
-                      {survey.land_area_m2 ? `${survey.land_area_m2.toLocaleString('vi-VN')} m²` : 'Chưa có'}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
               <CardContent className="pt-4">
                 <div className="flex items-center gap-3">
@@ -662,8 +652,9 @@ export default function SurveyDetailPage() {
                         placeholder="Nhập số giấy chứng nhận QSDĐ..."
                         value={certificateNumber}
                         onChange={(e) => setCertificateNumber(e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                        className={`w-full rounded-md border border-gray-300 px-3 py-2 ${isReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                         list="certificate-suggestions"
+                        disabled={isReadOnly}
                       />
                       <datalist id="certificate-suggestions">
                         {availableCertificates.map((cert) => (
@@ -673,7 +664,7 @@ export default function SurveyDetailPage() {
                     </div>
                     <Button
                       onClick={handleCertificateSearch}
-                      disabled={certificateSearchLoading || !certificateNumber}
+                      disabled={certificateSearchLoading || !certificateNumber || isReadOnly}
                       className="gap-2"
                     >
                       <Search className="h-4 w-4" />
@@ -767,7 +758,7 @@ export default function SurveyDetailPage() {
                               )}
                               <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
                                 {owner.owner_type === 'individual' ? 'Cá nhân' :
-                                 owner.owner_type === 'organization' ? 'Tổ chức' : 'Hộ gia đình'}
+                                  owner.owner_type === 'organization' ? 'Tổ chức' : 'Hộ gia đình'}
                               </span>
                             </div>
                             <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
@@ -785,15 +776,17 @@ export default function SurveyDetailPage() {
                               )}
                             </div>
                           </div>
+                          {owner.ownership_share != null && owner.ownership_share > 0 && (
                           <div className="text-right">
                             <p className="text-lg font-bold text-blue-600">
-                              {owner.ownership_share || 100}%
+                              {owner.ownership_share}%
                             </p>
                             <p className="text-xs text-gray-500">
                               {owner.ownership_type === 'owner' ? 'Sở hữu' :
-                               owner.ownership_type === 'co_owner' ? 'Đồng sở hữu' : 'Đại diện'}
+                                owner.ownership_type === 'co_owner' ? 'Đồng sở hữu' : 'Đại diện'}
                             </p>
                           </div>
+                        )}
                         </div>
                       ))}
                     </div>
@@ -840,18 +833,20 @@ export default function SurveyDetailPage() {
                   </div>
 
                   {/* Unlink Button */}
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleUnlinkParcel}
-                      disabled={parcelLinking || survey.status !== 'pending'}
-                      className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
-                    >
-                      <Unlink className="h-4 w-4" />
-                      {parcelLinking ? 'Đang xử lý...' : 'Hủy liên kết'}
-                    </Button>
-                  </div>
+                  {!isReadOnly && (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUnlinkParcel}
+                        disabled={parcelLinking}
+                        className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        <Unlink className="h-4 w-4" />
+                        {parcelLinking ? 'Đang xử lý...' : 'Hủy liên kết'}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -862,7 +857,7 @@ export default function SurveyDetailPage() {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <User className="h-5 w-5 text-gray-600" />
-                Người liên hệ tại hiện trường
+                Người liên hệ khi khảo sát
                 <span className="text-xs font-normal text-gray-500">(Tùy chọn)</span>
               </CardTitle>
             </CardHeader>
@@ -877,9 +872,10 @@ export default function SurveyDetailPage() {
                   <input
                     type="text"
                     value={survey.representative_name || ''}
-                    onChange={(e) => setSurvey({ ...survey, representative_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    onChange={(e) => !isReadOnly && setSurvey({ ...survey, representative_name: e.target.value })}
+                    className={`mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 ${isReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                     placeholder="(Tùy chọn)"
+                    readOnly={isReadOnly}
                   />
                 </div>
                 <div>
@@ -887,9 +883,10 @@ export default function SurveyDetailPage() {
                   <input
                     type="text"
                     value={survey.representative_id_number || ''}
-                    onChange={(e) => setSurvey({ ...survey, representative_id_number: e.target.value })}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    onChange={(e) => !isReadOnly && setSurvey({ ...survey, representative_id_number: e.target.value })}
+                    className={`mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 ${isReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                     placeholder="(Tùy chọn)"
+                    readOnly={isReadOnly}
                   />
                 </div>
                 <div>
@@ -897,9 +894,10 @@ export default function SurveyDetailPage() {
                   <input
                     type="text"
                     value={survey.representative_phone || ''}
-                    onChange={(e) => setSurvey({ ...survey, representative_phone: e.target.value })}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    onChange={(e) => !isReadOnly && setSurvey({ ...survey, representative_phone: e.target.value })}
+                    className={`mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 ${isReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                     placeholder="(Tùy chọn)"
+                    readOnly={isReadOnly}
                   />
                 </div>
               </div>
@@ -907,7 +905,7 @@ export default function SurveyDetailPage() {
           </Card>
 
           {/* Land Info */}
-          <Card>
+          {/* <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Layers className="h-5 w-5 text-amber-600" />
@@ -954,7 +952,7 @@ export default function SurveyDetailPage() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Notes */}
           <Card>
@@ -967,10 +965,11 @@ export default function SurveyDetailPage() {
             <CardContent>
               <textarea
                 value={survey.notes || ''}
-                onChange={(e) => setSurvey({ ...survey, notes: e.target.value })}
+                onChange={(e) => !isReadOnly && setSurvey({ ...survey, notes: e.target.value })}
                 rows={4}
-                className="block w-full rounded-md border border-gray-300 px-3 py-2"
+                className={`block w-full rounded-md border border-gray-300 px-3 py-2 ${isReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                 placeholder="Thêm ghi chú về khảo sát này..."
+                readOnly={isReadOnly}
               />
             </CardContent>
           </Card>
@@ -1032,8 +1031,9 @@ export default function SurveyDetailPage() {
                   <input
                     type="text"
                     value={survey.location_name || ''}
-                    onChange={(e) => setSurvey({ ...survey, location_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    onChange={(e) => !isReadOnly && setSurvey({ ...survey, location_name: e.target.value })}
+                    className={`mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 ${isReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                    readOnly={isReadOnly}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">

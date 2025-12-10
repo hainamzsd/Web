@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import {
   User,
   Mail,
-  Phone,
   Building2,
   Shield,
   Calendar,
@@ -28,7 +27,6 @@ export default function ProfilePage() {
 
   const [formData, setFormData] = useState({
     full_name: '',
-    phone: '',
     unit: '',
     police_id: '',
   })
@@ -37,7 +35,6 @@ export default function ProfilePage() {
     if (webUser?.profile) {
       setFormData({
         full_name: webUser.profile.full_name || '',
-        phone: webUser.profile.phone || '',
         unit: webUser.profile.unit || '',
         police_id: webUser.profile.police_id || '',
       })
@@ -71,7 +68,6 @@ export default function ProfilePage() {
         .from('user_profiles')
         .update({
           full_name: formData.full_name,
-          phone: formData.phone,
           unit: formData.unit,
           police_id: formData.police_id,
           updated_at: new Date().toISOString(),
@@ -89,8 +85,8 @@ export default function ProfilePage() {
     }
   }
 
-  const createdAt = webUser?.profile?.created_at
-    ? new Date(webUser.profile.created_at).toLocaleDateString('vi-VN', {
+  const createdAt = webUser?.created_at
+    ? new Date(webUser.created_at).toLocaleDateString('vi-VN', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
@@ -221,25 +217,6 @@ export default function ProfilePage() {
                   />
                 </div>
                 <p className="mt-1 text-xs text-gray-500">Email không thể thay đổi</p>
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Số điện thoại
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Phone className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="block w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                    placeholder="Nhập số điện thoại"
-                  />
-                </div>
               </div>
 
               {/* Unit */}

@@ -372,15 +372,9 @@ export default function CentralSurveyDetailPage() {
                 <p className="font-medium font-mono">{survey.longitude}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Mã thửa đất</p>
-                <p className="font-medium">{survey.parcel_code || '-'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Diện tích (m²)</p>
-                <p className="font-medium">{survey.land_area_m2 || '-'}</p>
-              </div>
+            <div>
+              <p className="text-sm text-gray-500">Mã thửa đất</p>
+              <p className="font-medium">{survey.parcel_code || '-'}</p>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
@@ -404,7 +398,7 @@ export default function CentralSurveyDetailPage() {
           <CardHeader className="bg-gradient-to-r from-gray-50 to-slate-50">
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5 text-gray-600" />
-              Người liên hệ tại hiện trường
+              Người liên hệ khi khảo sát
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
@@ -511,7 +505,7 @@ export default function CentralSurveyDetailPage() {
                         )}
                         <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
                           {owner.owner_type === 'individual' ? 'Cá nhân' :
-                           owner.owner_type === 'organization' ? 'Tổ chức' : 'Hộ gia đình'}
+                            owner.owner_type === 'organization' ? 'Tổ chức' : 'Hộ gia đình'}
                         </span>
                       </div>
                       <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
@@ -529,15 +523,17 @@ export default function CentralSurveyDetailPage() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-blue-600">
-                        {owner.ownership_share || 100}%
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {owner.ownership_type === 'owner' ? 'Sở hữu' :
-                         owner.ownership_type === 'co_owner' ? 'Đồng sở hữu' : 'Đại diện'}
-                      </p>
-                    </div>
+                    {owner.ownership_share != null && owner.ownership_share > 0 && (
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-blue-600">
+                          {owner.ownership_share}%
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {owner.ownership_type === 'owner' ? 'Sở hữu' :
+                            owner.ownership_type === 'co_owner' ? 'Đồng sở hữu' : 'Đại diện'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
