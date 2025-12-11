@@ -35,17 +35,36 @@ export default function LocationsPage() {
       if (!webUser) return
 
       try {
-        const { data, error } = await supabase
+        // First fetch location identifiers
+        const { data: locData, error: locError } = await supabase
           .from('location_identifiers')
-          .select(`
-            *,
-            survey_location:survey_locations(location_name, address, owner_name)
-          `)
+          .select('*')
           .order('assigned_at', { ascending: false })
           .limit(100)
 
-        if (error) throw error
-        setLocations((data || []) as LocationIdentifier[])
+        if (locError) throw locError
+
+        // Then fetch survey details for each location
+        if (locData && locData.length > 0) {
+          const surveyIds = locData.map(l => l.survey_location_id).filter(Boolean)
+
+          const { data: surveyData } = await supabase
+            .from('survey_locations')
+            .select('id, location_name, address, owner_name')
+            .in('id', surveyIds)
+
+          // Map survey data to locations
+          const surveyMap = new Map(surveyData?.map(s => [s.id, s]) || [])
+
+          const enrichedData = locData.map(loc => ({
+            ...loc,
+            survey_location: surveyMap.get(loc.survey_location_id) || null
+          }))
+
+          setLocations(enrichedData as LocationIdentifier[])
+        } else {
+          setLocations([])
+        }
       } catch (error) {
         console.error('Error fetching locations:', error)
       } finally {

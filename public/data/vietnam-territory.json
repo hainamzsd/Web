@@ -1,0 +1,220 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quần đảo Hoàng Sa",
+        "name_en": "Paracel Islands",
+        "type": "archipelago",
+        "sovereignty": "Vietnam",
+        "description": "Quần đảo Hoàng Sa thuộc chủ quyền Việt Nam"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [111.0, 17.2],
+          [113.0, 17.2],
+          [113.0, 15.5],
+          [111.0, 15.5],
+          [111.0, 17.2]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Phú Lâm",
+        "name_en": "Woody Island",
+        "type": "island",
+        "archipelago": "Hoàng Sa",
+        "sovereignty": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [112.3333, 16.8333]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Linh Côn",
+        "name_en": "Lincoln Island",
+        "type": "island",
+        "archipelago": "Hoàng Sa",
+        "sovereignty": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [112.7167, 16.6667]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Tri Tôn",
+        "name_en": "Triton Island",
+        "type": "island",
+        "archipelago": "Hoàng Sa",
+        "sovereignty": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [111.2000, 15.7833]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Hoàng Sa",
+        "name_en": "Pattle Island",
+        "type": "island",
+        "archipelago": "Hoàng Sa",
+        "sovereignty": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [111.9167, 16.5333]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Quần đảo Trường Sa",
+        "name_en": "Spratly Islands",
+        "type": "archipelago",
+        "sovereignty": "Vietnam",
+        "description": "Quần đảo Trường Sa thuộc chủ quyền Việt Nam"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [111.0, 12.0],
+          [117.5, 12.0],
+          [117.5, 6.0],
+          [111.0, 6.0],
+          [111.0, 12.0]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Trường Sa Lớn",
+        "name_en": "Spratly Island",
+        "type": "island",
+        "archipelago": "Trường Sa",
+        "sovereignty": "Vietnam",
+        "controlled_by": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [111.9167, 8.6500]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Song Tử Tây",
+        "name_en": "Southwest Cay",
+        "type": "island",
+        "archipelago": "Trường Sa",
+        "sovereignty": "Vietnam",
+        "controlled_by": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [114.3333, 11.4333]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Sinh Tồn",
+        "name_en": "Sin Cowe Island",
+        "type": "island",
+        "archipelago": "Trường Sa",
+        "sovereignty": "Vietnam",
+        "controlled_by": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [114.3333, 9.8833]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Nam Yết",
+        "name_en": "Namyit Island",
+        "type": "island",
+        "archipelago": "Trường Sa",
+        "sovereignty": "Vietnam",
+        "controlled_by": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [114.3667, 10.1833]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Sơn Ca",
+        "name_en": "Sand Cay",
+        "type": "island",
+        "archipelago": "Trường Sa",
+        "sovereignty": "Vietnam",
+        "controlled_by": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [114.4833, 10.3833]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo Phan Vinh",
+        "name_en": "Pearson Reef",
+        "type": "island",
+        "archipelago": "Trường Sa",
+        "sovereignty": "Vietnam",
+        "controlled_by": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [113.6833, 8.9500]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Đảo An Bang",
+        "name_en": "Amboyna Cay",
+        "type": "island",
+        "archipelago": "Trường Sa",
+        "sovereignty": "Vietnam",
+        "controlled_by": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [112.9167, 7.8667]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Bãi Tư Chính",
+        "name_en": "Vanguard Bank",
+        "type": "reef",
+        "archipelago": "Trường Sa",
+        "sovereignty": "Vietnam"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [110.0000, 7.4167]
+      }
+    }
+  ]
+}

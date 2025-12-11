@@ -1,21 +1,30 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/lib/auth/auth-context'
 import { createClient } from '@/lib/supabase/client'
-import { SurveyMapWrapper } from '@/components/map/survey-map-wrapper'
 import { Database } from '@/lib/types/database'
-import { Map, Globe, Filter } from 'lucide-react'
-import { LocationIdentifierData } from '@/components/map/traffic-light-marker'
+import { EntryPoint, rowToEntryPoint } from '@/lib/types/entry-points'
+import { Globe } from 'lucide-react'
+
+// Dynamic import for BoundaryMap to avoid SSR issues
+const BoundaryMap = dynamic(() => import('@/components/map/boundary-map'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full bg-gray-100">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+    </div>
+  )
+})
 
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
 export default function CentralMapPage() {
   const { webUser, loading: authLoading } = useAuth()
   const [surveys, setSurveys] = useState<SurveyLocation[]>([])
-  const [locationIdentifiers, setLocationIdentifiers] = useState<Record<string, LocationIdentifierData>>({})
+  const [entryPoints, setEntryPoints] = useState<EntryPoint[]>([])
   const [dataLoading, setDataLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>('all')
   const supabase = createClient()
 
   useEffect(() => {
@@ -28,34 +37,29 @@ export default function CentralMapPage() {
       }
 
       try {
-        // Fetch surveys and location identifiers in parallel
-        const [surveysResult, locationIdsResult] = await Promise.all([
-          // Central admin can see all surveys
-          supabase
-            .from('survey_locations')
+        // Central admin can see all surveys
+        const { data, error } = await supabase
+          .from('survey_locations')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        const surveysData = (data || []) as SurveyLocation[]
+        setSurveys(surveysData)
+
+        // Fetch entry points for all surveys
+        if (surveysData.length > 0) {
+          const surveyIds = surveysData.map(s => s.id)
+          const { data: entryData } = await supabase
+            .from('survey_entry_points')
             .select('*')
-            .order('created_at', { ascending: false }),
-          // Fetch all location identifiers
-          supabase
-            .from('location_identifiers')
-            .select('survey_location_id, location_id, is_active, deactivation_reason')
-        ])
+            .in('survey_location_id', surveyIds)
+            .order('sequence_number')
 
-        if (surveysResult.error) throw surveysResult.error
-        if (locationIdsResult.error) throw locationIdsResult.error
-
-        setSurveys((surveysResult.data || []) as any)
-
-        // Convert location identifiers to a map keyed by survey_location_id
-        const locIdMap: Record<string, LocationIdentifierData> = {}
-        for (const locId of locationIdsResult.data || []) {
-          locIdMap[locId.survey_location_id] = {
-            location_id: locId.location_id,
-            is_active: locId.is_active,
-            deactivation_reason: locId.deactivation_reason
+          if (entryData) {
+            setEntryPoints(entryData.map(rowToEntryPoint))
           }
         }
-        setLocationIdentifiers(locIdMap)
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
@@ -79,32 +83,6 @@ export default function CentralMapPage() {
     )
   }
 
-  // Apply status filter
-  const filteredSurveys = statusFilter === 'all'
-    ? surveys
-    : surveys.filter(s => {
-        if (statusFilter === 'pending') return s.status === 'pending' || s.status === 'reviewed'
-        if (statusFilter === 'approved') return s.status === 'approved_commune' || s.status === 'approved_central' || s.status === 'published'
-        if (statusFilter === 'rejected') return s.status === 'rejected'
-        // Filter surveys that have location identifiers (from location_identifiers table)
-        if (statusFilter === 'has_id') return !!locationIdentifiers[s.id]
-        return true
-      })
-
-  const statusCounts = surveys.reduce((acc, survey) => {
-    acc[survey.status] = (acc[survey.status] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
-
-  const approvedCount = (statusCounts['approved_commune'] || 0) +
-    (statusCounts['approved_central'] || 0) +
-    (statusCounts['published'] || 0)
-
-  const pendingCount = (statusCounts['pending'] || 0) + (statusCounts['reviewed'] || 0)
-
-  // Count surveys that have location identifiers from the location_identifiers table
-  const withIdCount = Object.keys(locationIdentifiers).length
-
   return (
     <div className="flex flex-col -m-6" style={{ height: 'calc(100vh - 56px)' }}>
       {/* Compact Header */}
@@ -115,65 +93,21 @@ export default function CentralMapPage() {
             <div>
               <h1 className="text-lg font-semibold">Bản đồ Toàn quốc</h1>
               <p className="text-slate-400 text-sm">
-                {filteredSurveys.length} / {surveys.length} vị trí • Tìm kiếm mã định danh
+                {surveys.length} khảo sát • Chọn tỉnh/thành phố để xem chi tiết
               </p>
-            </div>
-          </div>
-
-          {/* Filters & Stats */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Status Filter */}
-            <div className="flex items-center gap-1 bg-slate-700/50 rounded-lg p-1 border border-slate-600/50">
-              <button
-                onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                  statusFilter === 'all' ? 'bg-white text-slate-800' : 'text-slate-300 hover:bg-slate-600/50'
-                }`}
-              >
-                Tất cả ({surveys.length})
-              </button>
-              <button
-                onClick={() => setStatusFilter('pending')}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                  statusFilter === 'pending' ? 'bg-amber-500 text-white' : 'text-slate-300 hover:bg-slate-600/50'
-                }`}
-              >
-                Chờ ({pendingCount})
-              </button>
-              <button
-                onClick={() => setStatusFilter('approved')}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                  statusFilter === 'approved' ? 'bg-green-500 text-white' : 'text-slate-300 hover:bg-slate-600/50'
-                }`}
-              >
-                Duyệt ({approvedCount})
-              </button>
-              <button
-                onClick={() => setStatusFilter('has_id')}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                  statusFilter === 'has_id' ? 'bg-purple-500 text-white' : 'text-slate-300 hover:bg-slate-600/50'
-                }`}
-              >
-                Có mã ({withIdCount})
-              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Full Height Map with 2D/3D Toggle */}
+      {/* Full Height Map - Central has full access */}
       <div className="flex-1 relative min-h-0">
-        <SurveyMapWrapper
-          surveys={filteredSurveys}
-          showClustering={filteredSurveys.length > 100}
-          showHeatmap={false}
-          enableDrawing={false}
+        <BoundaryMap
+          role="central_admin"
+          surveys={surveys}
+          entryPoints={entryPoints}
           height="100%"
-          showSearch={true}
           baseDetailUrl="/central/surveys"
-          locationIdentifiers={locationIdentifiers}
-          showModeToggle={true}
-          defaultMode="2d"
         />
       </div>
     </div>

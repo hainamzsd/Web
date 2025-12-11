@@ -25,11 +25,12 @@ export default async function ApprovalsPage() {
     redirect('/login')
   }
 
-  // Fetch surveys awaiting central approval
+  // Fetch surveys awaiting central approval (đã được Tỉnh phê duyệt)
+  // Support both old status (approved_commune) and new status (approved_province) for backward compatibility
   const { data: surveys } = await supabase
     .from('survey_locations')
     .select('*')
-    .eq('status', 'approved_commune')
+    .in('status', ['approved_province', 'approved_commune'])
     .order('updated_at', { ascending: false })
 
   return <ApprovalsClient initialSurveys={surveys || []} />

@@ -44,13 +44,12 @@ export default function ReviewsPage() {
       let query = supabase
         .from('survey_locations')
         .select('*')
+        // Tỉnh duyệt survey pending (và reviewed cho backward compatibility)
         .in('status', ['pending', 'reviewed'])
         .order('created_at', { ascending: false })
 
-      // Filter by ward_id first, then province_id, then province_code
-      if (webUser.ward_id) {
-        query = query.eq('ward_id', webUser.ward_id)
-      } else if (webUser.province_id) {
+      // Tỉnh lọc theo province_id hoặc province_code (tất cả xã trong tỉnh)
+      if (webUser.province_id) {
         query = query.eq('province_id', webUser.province_id)
       } else if (webUser.province_code) {
         query = query.eq('province_code', webUser.province_code)
@@ -104,9 +103,9 @@ export default function ReviewsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Chờ xử lý</span>
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Chờ phê duyệt</span>
       case 'reviewed':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Đã xem xét</span>
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800">Đã xem xét (cũ)</span>
       default:
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{status}</span>
     }
@@ -125,9 +124,9 @@ export default function ReviewsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Xem xét khảo sát</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Phê duyệt cấp Tỉnh</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Danh sách khảo sát cần xem xét và phê duyệt
+            Danh sách khảo sát từ các xã trong tỉnh chờ phê duyệt
           </p>
         </div>
         <Button onClick={fetchSurveys} variant="outline" size="sm" className="gap-2">
@@ -149,17 +148,9 @@ export default function ReviewsPage() {
                 className="pl-10"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="pending">Chờ xử lý</option>
-                <option value="reviewed">Đã xem xét</option>
-              </select>
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-md border border-amber-200">
+              <Clock className="h-4 w-4 text-amber-600" />
+              <span className="text-sm text-amber-700 font-medium">Chờ phê duyệt</span>
             </div>
           </div>
         </CardContent>

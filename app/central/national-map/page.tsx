@@ -118,7 +118,7 @@ export default function NationalMapPage() {
 
       statsByProvince[provinceId].total++
       if (survey.status === 'pending' || survey.status === 'reviewed') statsByProvince[provinceId].pending++
-      if (survey.status === 'approved_central' || survey.status === 'approved_commune' || survey.status === 'published') {
+      if (survey.status === 'approved_central' || survey.status === 'approved_commune' || survey.status === 'approved_province' || survey.status === 'published') {
         statsByProvince[provinceId].approved++
       }
       if (survey.status === 'rejected') statsByProvince[provinceId].rejected++
@@ -130,7 +130,7 @@ export default function NationalMapPage() {
   const totalSurveys = surveys.length
   const pendingSurveys = surveys.filter(s => s.status === 'pending' || s.status === 'reviewed').length
   const approvedSurveys = surveys.filter(s =>
-    s.status === 'approved_central' || s.status === 'approved_commune'
+    s.status === 'approved_central' || s.status === 'approved_commune' || s.status === 'approved_province'
   ).length
   const assignedIds = surveys.filter(s => s.location_identifier).length
 

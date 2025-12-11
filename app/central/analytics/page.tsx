@@ -29,6 +29,7 @@ const STATUS_COLORS = {
   pending: '#f59e0b',
   reviewed: '#0ea5e9',
   approved_commune: '#8b5cf6',
+  approved_province: '#a855f7',
   approved_central: '#3b82f6',
   published: '#10b981',
   rejected: '#ef4444',
@@ -225,7 +226,8 @@ export default function AnalyticsPage() {
     const statusNames: { [key: string]: string } = {
       pending: 'Chờ xử lý',
       reviewed: 'Đã xem xét',
-      approved_commune: 'Duyệt xã',
+      approved_commune: 'Duyệt xã (cũ)',
+      approved_province: 'Duyệt tỉnh',
       approved_central: 'Duyệt TW',
       published: 'Đã công bố',
       rejected: 'Từ chối',

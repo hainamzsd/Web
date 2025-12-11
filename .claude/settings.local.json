@@ -20,7 +20,9 @@
       "Bash(find:*)",
       "Bash(npx tsc:*)",
       "Bash(cat:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm run dev:*)",
+      "Bash(node scripts/process-vietnam-geojson.js:*)"
     ],
     "deny": [],
     "ask": []

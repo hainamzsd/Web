@@ -10,7 +10,9 @@ import {
   User,
   Settings,
   Shield,
-  Calendar
+  Calendar,
+  Search,
+  Command
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
@@ -41,10 +43,10 @@ export function Header() {
   }
 
   const roleColors: Record<string, string> = {
-    commune_officer: 'bg-violet-500/20 text-violet-200 border-violet-400/30',
-    commune_supervisor: 'bg-teal-500/20 text-teal-200 border-teal-400/30',
-    central_admin: 'bg-blue-500/20 text-blue-200 border-blue-400/30',
-    system_admin: 'bg-slate-500/20 text-slate-200 border-slate-400/30',
+    commune_officer: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+    commune_supervisor: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+    central_admin: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+    system_admin: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
   }
 
   const getInitials = (name: string) => {
@@ -64,55 +66,68 @@ export function Header() {
   })
 
   return (
-    <header className="relative z-[2000] bg-gradient-to-r from-slate-800 to-slate-900">
-      <div className="flex h-14 items-center justify-between px-6">
-        {/* Left side - Title & Date */}
+    <header className="relative z-[2000] bg-slate-900 border-b border-slate-800">
+      <div className="flex h-16 items-center justify-between px-6">
+        {/* Left side - Search & Date */}
         <div className="flex items-center gap-6">
-          <div>
-            <h1 className="text-base font-semibold text-white">
-              Hệ thống Định danh Vị trí Quốc gia
-            </h1>
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <Calendar className="h-3 w-3" />
-              <span>{today}</span>
+          {/* Search Bar */}
+          <div className="hidden md:flex items-center gap-3 rounded-xl bg-slate-800/50 border border-slate-700/50 px-4 py-2.5 w-72 hover:border-slate-600 transition-colors cursor-pointer">
+            <Search className="h-4 w-4 text-slate-500" />
+            <span className="text-sm text-slate-500">Tìm kiếm...</span>
+            <div className="ml-auto flex items-center gap-1 rounded-md bg-slate-700/50 px-2 py-0.5">
+              <Command className="h-3 w-3 text-slate-400" />
+              <span className="text-xs text-slate-400">K</span>
             </div>
+          </div>
+
+          {/* Date */}
+          <div className="hidden lg:flex items-center gap-2 text-sm text-slate-400">
+            <Calendar className="h-4 w-4" />
+            <span>{today}</span>
           </div>
         </div>
 
         {/* Right side - Actions & User */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Notifications */}
+          {/* <button className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-white hover:border-slate-600 transition-all">
+            <Bell className="h-5 w-5" />
+            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+              3
+            </span>
+          </button> */}
 
           {/* Divider */}
-          <div className="h-8 w-px bg-slate-600" />
+          <div className="h-8 w-px bg-slate-700" />
 
           {/* User Profile */}
           {webUser && (
-            <div className="relative ">
+            <div className="relative">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-3 rounded-xl border border-slate-600/50 bg-slate-700/50 px-4  transition-all hover:bg-slate-700 hover:border-slate-500"
+                className="flex items-center gap-3 rounded-xl border border-slate-700/50 bg-slate-800/50 pl-2 pr-4 py-2 transition-all hover:bg-slate-800 hover:border-slate-600"
               >
-                <Avatar className="h-8 w-8 border-2 border-slate-500 shadow-sm">
+                <Avatar className="h-9 w-9 border-2 border-slate-600 shadow-lg">
                   <AvatarImage
                     src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Vietnam_People%27s_Public_Security_Emblem.png"
                     alt={webUser.profile?.full_name || 'User'}
                   />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs font-medium">
+                  <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-medium">
                     {webUser.profile?.full_name ? getInitials(webUser.profile.full_name) : 'U'}
                   </AvatarFallback>
                 </Avatar>
 
-                <div className="hidden text-left md:block">
-                  <div className="text-sm font-medium text-white">
+                <div className="hidden md:block text-left">
+                  <div className="text-sm font-medium text-slate-200">
                     {webUser.profile?.full_name || user?.email?.split('@')[0]}
                   </div>
-                  <div className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${roleColors[webUser.role]}`}>
+                  <div className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${roleColors[webUser.role]}`}>
                     <Shield className="h-2.5 w-2.5" />
                     {roleLabels[webUser.role]}
                   </div>
                 </div>
 
-                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Dropdown Menu */}
@@ -122,39 +137,39 @@ export function Header() {
                     className="fixed inset-0 z-[2001]"
                     onClick={() => setShowUserMenu(false)}
                   />
-                  <div className="absolute right-0 top-full z-[2002] mt-3 w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+                  <div className="absolute right-0 top-full z-[2002] mt-2 w-80 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 shadow-2xl shadow-black/50">
                     {/* User Info Header */}
-                    <div className="border-b border-gray-100 bg-gradient-to-br from-slate-50 to-gray-100 px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12 border-2 border-white shadow-lg ring-2 ring-gray-100">
+                    <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 border-b border-slate-700 px-5 py-4">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-14 w-14 border-2 border-slate-600 shadow-xl ring-2 ring-indigo-500/30">
                           <AvatarImage
                             src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Vietnam_People%27s_Public_Security_Emblem.png"
                             alt={webUser.profile?.full_name || 'User'}
                           />
-                          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-medium">
+                          <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-medium">
                             {webUser.profile?.full_name ? getInitials(webUser.profile.full_name) : 'U'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">
+                          <p className="text-base font-semibold text-white truncate">
                             {webUser.profile?.full_name || 'Người dùng'}
                           </p>
-                          <p className="text-xs text-gray-500 truncate">
+                          <p className="text-sm text-slate-400 truncate">
                             {user?.email}
                           </p>
-                          <div className="mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium bg-blue-50 text-blue-700 border-blue-200">
+                          <div className={`mt-1.5 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium ${roleColors[webUser.role]}`}>
                             <Shield className="h-2.5 w-2.5" />
                             {roleLabels[webUser.role]}
                           </div>
                         </div>
                       </div>
                       {(webUser.profile?.unit || webUser.profile?.police_id) && (
-                        <div className="mt-3 rounded-lg bg-white px-3 py-2 text-xs text-gray-600 shadow-sm border border-gray-100">
-                          <span className="font-medium text-gray-700">Đơn vị:</span> {webUser.profile?.unit}
+                        <div className="mt-4 rounded-xl bg-slate-900/50 px-4 py-2.5 text-sm text-slate-300 border border-slate-700">
+                          <span className="text-slate-500">Đơn vị:</span> {webUser.profile?.unit}
                           {webUser.profile?.unit && webUser.profile?.police_id && ' • '}
                           {webUser.profile?.police_id && (
                             <>
-                              <span className="font-medium text-gray-700">Mã:</span> {webUser.profile?.police_id}
+                              <span className="text-slate-500">Mã:</span> {webUser.profile?.police_id}
                             </>
                           )}
                         </div>
@@ -165,38 +180,38 @@ export function Header() {
                     <div className="p-2">
                       <button
                         onClick={() => handleNavigate('/account/profile')}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/50 transition-colors"
                       >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
-                          <User className="h-4 w-4 text-blue-600" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/20">
+                          <User className="h-5 w-5 text-indigo-400" />
                         </div>
                         <div className="text-left">
-                          <p className="font-medium">Thông tin cá nhân</p>
-                          <p className="text-xs text-gray-500">Xem và chỉnh sửa hồ sơ</p>
+                          <p className="font-medium text-slate-200">Thông tin cá nhân</p>
+                          <p className="text-xs text-slate-500">Xem và chỉnh sửa hồ sơ</p>
                         </div>
                       </button>
                       <button
                         onClick={() => handleNavigate('/account/settings')}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/50 transition-colors"
                       >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100">
-                          <Settings className="h-4 w-4 text-slate-600" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-600/50">
+                          <Settings className="h-5 w-5 text-slate-400" />
                         </div>
                         <div className="text-left">
-                          <p className="font-medium">Cài đặt tài khoản</p>
-                          <p className="text-xs text-gray-500">Bảo mật và tùy chọn</p>
+                          <p className="font-medium text-slate-200">Cài đặt tài khoản</p>
+                          <p className="text-xs text-slate-500">Bảo mật và tùy chọn</p>
                         </div>
                       </button>
                     </div>
 
                     {/* Logout */}
-                    <div className="border-t border-gray-100 p-2">
+                    <div className="border-t border-slate-700 p-2">
                       <button
                         onClick={handleSignOut}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                        className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
                       >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50">
-                          <LogOut className="h-4 w-4" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/20">
+                          <LogOut className="h-5 w-5" />
                         </div>
                         Đăng xuất khỏi hệ thống
                       </button>
@@ -208,8 +223,6 @@ export function Header() {
           )}
         </div>
       </div>
-      {/* Bottom border with gap effect */}
-      <div className="h-px bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700" />
     </header>
   )
 }

@@ -9,7 +9,7 @@ import { Database } from '@/lib/types/database'
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 type ApprovalHistory = Database['public']['Tables']['approval_history']['Insert']
 
-export type WorkflowAction = 'submit' | 'review' | 'approve' | 'reject' | 'forward'
+export type WorkflowAction = 'approve' | 'reject'
 
 export interface WorkflowResult {
   success: boolean
@@ -20,22 +20,35 @@ export interface WorkflowResult {
 
 /**
  * Workflow state transitions
+ *
+ * NEW FLOW:
+ * - App (Xã) creates survey → pending
+ * - Province (Tỉnh) approves → approved_province
+ * - Central (TW) approves → approved_central (after land parcel check)
+ *
+ * BACKWARD COMPATIBILITY (old statuses still supported):
+ * - reviewed → approved_province (Tỉnh can approve old 'reviewed' status)
+ * - approved_commune → approved_central (TW can approve old 'approved_commune' status)
  */
 const WORKFLOW_TRANSITIONS = {
   pending: {
-    submit: 'reviewed',
+    approve: 'approved_province',  // Province approves
     reject: 'rejected'
   },
   reviewed: {
-    approve: 'approved_commune',
+    approve: 'approved_province',  // Province approves (backward compatibility)
+    reject: 'rejected'
+  },
+  approved_province: {
+    approve: 'approved_central',   // Central approves (after land parcel verification)
     reject: 'rejected'
   },
   approved_commune: {
-    approve: 'approved_central',
+    approve: 'approved_central',   // Central approves (backward compatibility)
     reject: 'rejected'
   },
   rejected: {
-    submit: 'pending'
+    // Rejected surveys must be resubmitted from App
   }
 }
 
@@ -72,17 +85,12 @@ export async function executeWorkflowAction(
     const currentStatus = survey.status
 
     switch (action) {
-      case 'submit':
-      case 'forward':
-        newStatus = 'reviewed'
-        break
-      case 'review':
-        newStatus = 'reviewed'
-        break
       case 'approve':
-        if (currentStatus === 'reviewed') {
-          newStatus = 'approved_commune'
-        } else if (currentStatus === 'approved_commune') {
+        if (currentStatus === 'pending' || currentStatus === 'reviewed') {
+          // Province officer approves pending/reviewed survey
+          newStatus = 'approved_province'
+        } else if (currentStatus === 'approved_province' || currentStatus === 'approved_commune') {
+          // Central admin approves after land parcel verification
           newStatus = 'approved_central'
         } else {
           return {
@@ -92,7 +100,15 @@ export async function executeWorkflowAction(
         }
         break
       case 'reject':
-        newStatus = 'rejected'
+        if (currentStatus === 'pending' || currentStatus === 'reviewed' ||
+            currentStatus === 'approved_province' || currentStatus === 'approved_commune') {
+          newStatus = 'rejected'
+        } else {
+          return {
+            success: false,
+            message: 'Không thể từ chối từ trạng thái hiện tại'
+          }
+        }
         break
       default:
         return {
@@ -121,7 +137,7 @@ export async function executeWorkflowAction(
     // Log approval history
     const historyRecord: ApprovalHistory = {
       survey_location_id: surveyId,
-      action: action === 'forward' ? 'reviewed' : action as any,
+      action: action as any,
       actor_id: actorId,
       actor_role: actorRole,
       previous_status: currentStatus,
@@ -254,14 +270,9 @@ async function logAuditTrail(
  */
 function getSuccessMessage(action: WorkflowAction, newStatus: string): string {
   switch (action) {
-    case 'submit':
-    case 'forward':
-      return 'Đã gửi khảo sát để xem xét'
-    case 'review':
-      return 'Đã xem xét khảo sát'
     case 'approve':
-      if (newStatus === 'approved_commune') {
-        return 'Đã phê duyệt ở cấp xã'
+      if (newStatus === 'approved_province') {
+        return 'Đã phê duyệt ở cấp tỉnh'
       } else if (newStatus === 'approved_central') {
         return 'Đã phê duyệt ở cấp trung ương'
       }
@@ -275,60 +286,59 @@ function getSuccessMessage(action: WorkflowAction, newStatus: string): string {
 
 /**
  * Validate if user can perform action on survey
+ *
+ * WORKFLOW:
+ * - commune_officer: View only (stats + map) - Xã chỉ xem
+ * - commune_supervisor: Approve/reject pending surveys (Tỉnh phê duyệt)
+ * - central_admin: Approve/reject approved_province surveys (TW - after land parcel check)
+ * - system_admin: Full access
  */
 export function canPerformAction(
   survey: SurveyLocation,
   action: WorkflowAction,
   userRole: string,
-  userCommuneCode?: string | null
+  userProvinceCode?: string | null
 ): { allowed: boolean; reason?: string } {
-  // Check commune jurisdiction for commune-level roles
-  if (
-    (userRole === 'commune_officer' || userRole === 'commune_supervisor') &&
-    survey.ward_code !== userCommuneCode
-  ) {
-    return {
-      allowed: false,
-      reason: 'Khảo sát không thuộc quyền hạn của bạn'
-    }
-  }
-
-  // Check action permissions based on role and status
   const status = survey.status
 
   switch (userRole) {
     case 'commune_officer':
-      if (action === 'forward' && status === 'pending') {
-        return { allowed: true }
-      }
-      if (action === 'submit' && (status === 'pending' || status === 'rejected')) {
-        return { allowed: true }
-      }
+      // Commune officers can only view, no approval actions
       return {
         allowed: false,
-        reason: 'Bạn không có quyền thực hiện hành động này'
+        reason: 'Cán bộ xã chỉ có quyền xem, không có quyền phê duyệt'
       }
 
     case 'commune_supervisor':
-      if ((action === 'approve' || action === 'reject') && status === 'reviewed') {
+      // Province (Tỉnh) can approve/reject pending/reviewed surveys in their province
+      if (survey.province_code !== userProvinceCode) {
+        return {
+          allowed: false,
+          reason: 'Khảo sát không thuộc tỉnh của bạn'
+        }
+      }
+      // Support both new 'pending' and old 'reviewed' status
+      if ((action === 'approve' || action === 'reject') && (status === 'pending' || status === 'reviewed')) {
         return { allowed: true }
       }
       return {
         allowed: false,
-        reason: 'Bạn không có quyền thực hiện hành động này'
+        reason: 'Chỉ có thể phê duyệt khảo sát đang chờ xử lý'
       }
 
     case 'central_admin':
     case 'system_admin':
+      // Central can approve/reject surveys already approved by province
+      // Support both new 'approved_province' and old 'approved_commune' status
       if (
         (action === 'approve' || action === 'reject') &&
-        status === 'approved_commune'
+        (status === 'approved_province' || status === 'approved_commune')
       ) {
         return { allowed: true }
       }
       return {
         allowed: false,
-        reason: 'Chỉ có thể phê duyệt khảo sát đã được phê duyệt cấp xã'
+        reason: 'Chỉ có thể phê duyệt khảo sát đã được tỉnh phê duyệt'
       }
 
     default:

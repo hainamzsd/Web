@@ -146,7 +146,7 @@ export interface Database {
         Update: {
           id?: string
           profile_id?: string
-          role?: 'commune_officer' | 'commune_supervisor' | 'central_admin' | 'system_admin'
+          role?: 'commune_officer' | 'province_officer' | 'central_admin' | 'system_admin'
           commune_code?: string | null
           district_code?: string | null
           province_code?: string | null
@@ -187,7 +187,7 @@ export interface Database {
           land_area_m2: number | null
           photos: string[]
           notes: string | null
-          status: 'pending' | 'reviewed' | 'approved_commune' | 'rejected' | 'approved_central'
+          status: 'pending' | 'reviewed' | 'approved_commune' | 'approved_province' | 'approved_central' | 'rejected'
           location_identifier: string | null
           // Land parcel linkage
           land_parcel_id: string | null

@@ -179,7 +179,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SubmitRes
           gps_source: body.gpsSource,
           rough_area: body.roughArea ? JSON.stringify(body.roughArea) : null,
           has_rough_area: !!body.roughArea,
-          status: body.status || 'draft',
+          // Survey submitted goes to pending for Province (Tỉnh) approval
+          status: body.status || 'pending',
           synced_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -215,7 +216,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SubmitRes
       });
     }
 
-    // Create new survey
+    // Create new survey - status 'pending' goes directly to Province (Tỉnh) for approval
     const { data: created, error: createError } = await supabase
       .from('survey_locations')
       .insert({
@@ -238,7 +239,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SubmitRes
         gps_source: body.gpsSource,
         rough_area: body.roughArea ? JSON.stringify(body.roughArea) : null,
         has_rough_area: !!body.roughArea,
-        status: body.status || 'draft',
+        // Survey submitted goes to pending for Province (Tỉnh) approval
+        status: body.status || 'pending',
         synced_at: new Date().toISOString(),
       })
       .select()

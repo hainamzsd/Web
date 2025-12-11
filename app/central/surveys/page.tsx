@@ -127,7 +127,7 @@ export default function CentralSurveysPage() {
           </div>
           <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
             <div className="text-sm text-indigo-100">Chờ duyệt TW</div>
-            <div className="text-2xl font-bold">{statusCounts['approved_commune'] || 0}</div>
+            <div className="text-2xl font-bold">{(statusCounts['approved_commune'] || 0) + (statusCounts['approved_province'] || 0)}</div>
           </div>
           <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
             <div className="text-sm text-indigo-100">Đã xuất bản</div>
@@ -167,7 +167,8 @@ export default function CentralSurveysPage() {
                 <option value="">Tất cả trạng thái</option>
                 <option value="pending">Chờ xử lý</option>
                 <option value="reviewed">Đã xem xét</option>
-                <option value="approved_commune">Đã duyệt xã</option>
+                <option value="approved_commune">Đã duyệt xã (cũ)</option>
+                <option value="approved_province">Đã duyệt tỉnh</option>
                 <option value="approved_central">Đã duyệt TW</option>
                 <option value="published">Đã xuất bản</option>
                 <option value="rejected">Từ chối</option>

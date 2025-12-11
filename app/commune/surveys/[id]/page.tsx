@@ -78,8 +78,55 @@ export default function SurveyDetailPage() {
   const [linkedParcel, setLinkedParcel] = useState<LandParcelWithDetails | null>(null)
   const [parcelLinking, setParcelLinking] = useState(false)
   const [activeTab, setActiveTab] = useState<'info' | 'location' | 'media' | 'history'>('info')
+  const [wardBoundary, setWardBoundary] = useState<any>(null)
   const supabase = createClient()
   const availableCertificates = getAvailableCertificateNumbers()
+
+  // Load ward boundary for commune officers
+  useEffect(() => {
+    async function loadWardBoundary() {
+      if (!webUser?.province_id || !webUser?.ward_id) return
+
+      try {
+        // 1. Get province codename
+        const { data: provinceData } = await supabase
+          .from('provinces')
+          .select('codename')
+          .eq('code', webUser.province_id)
+          .single()
+
+        if (!provinceData?.codename) return
+
+        // 2. Convert codename to folder name (remove underscores: ha_noi -> hanoi)
+        const folderName = provinceData.codename.replace(/_/g, '')
+
+        // 3. Load ward GeoJSON for this province
+        const response = await fetch(`/geojson/${folderName}/ward.geojson`)
+        if (!response.ok) {
+          console.warn(`Ward GeoJSON not found for province: ${provinceData.codename}`)
+          return
+        }
+
+        const wardGeoJson = await response.json()
+
+        // 4. Find the specific ward by ma_xa (ward code)
+        // Note: GeoJSON ma_xa has leading zeros (e.g., "00070") but DB ward_id is integer (e.g., 70)
+        const wardFeature = wardGeoJson.features?.find(
+          (f: any) => parseInt(f.properties?.ma_xa, 10) === webUser.ward_id
+        )
+
+        if (wardFeature) {
+          setWardBoundary(wardFeature)
+        } else {
+          console.warn(`Ward ${webUser.ward_id} not found in GeoJSON`)
+        }
+      } catch (error) {
+        console.error('Error loading ward boundary:', error)
+      }
+    }
+
+    loadWardBoundary()
+  }, [webUser?.province_id, webUser?.ward_id, supabase])
 
   useEffect(() => {
     if (authLoading) return
@@ -413,7 +460,8 @@ export default function SurveyDetailPage() {
     const labels: Record<string, string> = {
       pending: 'Chờ xử lý',
       reviewed: 'Đã xem xét',
-      approved_commune: 'Đã duyệt (Xã)',
+      approved_province: 'Đã duyệt (Tỉnh)',
+      approved_commune: 'Đã duyệt (Xã cũ)',
       approved_central: 'Đã duyệt (TW)',
       rejected: 'Từ chối'
     }
@@ -431,7 +479,8 @@ export default function SurveyDetailPage() {
   }
 
   const loading = authLoading || dataLoading
-  const isReadOnly = survey?.status !== 'pending'
+  // Commune officers can only VIEW surveys - all editing/approval is done by App or Supervisor
+  const isReadOnly = true
 
   if (loading) {
     return (
@@ -490,28 +539,12 @@ export default function SurveyDetailPage() {
               </div>
             </div>
           </div>
+          {/* Commune officers only view - no action buttons */}
           <div className="flex gap-2">
-            {!isReadOnly && (
-              <>
-                <Button onClick={handleSave} disabled={saving} variant="outline" className="gap-2">
-                  <Save className="h-4 w-4" />
-                  {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                </Button>
-                <Button onClick={handleSubmitForReview} disabled={saving} className="gap-2 bg-green-600 hover:bg-green-700">
-                  <Send className="h-4 w-4" />
-                  {saving ? 'Đang gửi...' : 'Gửi lên cấp trên'}
-                </Button>
-              </>
-            )}
-            {isReadOnly && (
-              <span className="flex items-center gap-2 px-4 py-2 bg-sky-100 text-sky-700 rounded-md text-sm font-medium">
-                <Send className="h-4 w-4" />
-                {survey.status === 'reviewed' ? 'Đã gửi xem xét' :
-                 survey.status === 'approved_commune' ? 'Đã duyệt cấp xã' :
-                 survey.status === 'approved_central' ? 'Đã duyệt cấp TW' :
-                 survey.status === 'rejected' ? 'Đã từ chối' : survey.status}
-              </span>
-            )}
+            <span className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-md text-sm font-medium">
+              <FileText className="h-4 w-4" />
+              Chỉ xem
+            </span>
           </div>
         </div>
 
@@ -623,11 +656,11 @@ export default function SurveyDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Land Certificate Lookup - Required before submission */}
-          <Card className={!linkedParcel ? 'border-amber-300 bg-amber-50' : 'border-green-300 bg-green-50'}>
+          {/* Land Certificate Info - View Only for Commune Officers */}
+          <Card className={!linkedParcel ? 'border-gray-200' : 'border-green-300 bg-green-50'}>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <FileCheck className="h-5 w-5 text-amber-600" />
+                <FileCheck className="h-5 w-5 text-gray-600" />
                 Giấy chứng nhận QSDĐ
                 {linkedParcel ? (
                   <span className="ml-2 flex items-center gap-1 text-sm font-normal text-green-700 bg-green-100 px-2 py-0.5 rounded">
@@ -635,62 +668,19 @@ export default function SurveyDetailPage() {
                     Đã liên kết
                   </span>
                 ) : (
-                  <span className="ml-2 flex items-center gap-1 text-sm font-normal text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
-                    <AlertCircle className="h-4 w-4" />
-                    Bắt buộc trước khi gửi
+                  <span className="ml-2 flex items-center gap-1 text-sm font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                    Chưa có thông tin
                   </span>
                 )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {!linkedParcel ? (
-                <>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        placeholder="Nhập số giấy chứng nhận QSDĐ..."
-                        value={certificateNumber}
-                        onChange={(e) => setCertificateNumber(e.target.value)}
-                        className={`w-full rounded-md border border-gray-300 px-3 py-2 ${isReadOnly ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-                        list="certificate-suggestions"
-                        disabled={isReadOnly}
-                      />
-                      <datalist id="certificate-suggestions">
-                        {availableCertificates.map((cert) => (
-                          <option key={cert} value={cert} />
-                        ))}
-                      </datalist>
-                    </div>
-                    <Button
-                      onClick={handleCertificateSearch}
-                      disabled={certificateSearchLoading || !certificateNumber || isReadOnly}
-                      className="gap-2"
-                    >
-                      <Search className="h-4 w-4" />
-                      {certificateSearchLoading ? 'Đang tìm...' : 'Tra cứu'}
-                    </Button>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Nhập số giấy chứng nhận để tra cứu thông tin thửa đất và chủ sở hữu từ cơ sở dữ liệu Bộ TN&MT.
-                  </p>
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <strong>Số GCN mẫu để thử nghiệm:</strong>
-                    </p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {availableCertificates.slice(0, 3).map((cert) => (
-                        <button
-                          key={cert}
-                          onClick={() => setCertificateNumber(cert)}
-                          className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded transition-colors"
-                        >
-                          {cert}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
+                <div className="p-4 bg-gray-50 rounded-lg text-center text-gray-500">
+                  <FileCheck className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                  <p>Chưa có thông tin giấy chứng nhận QSDĐ</p>
+                  <p className="text-xs mt-1">Thông tin sẽ được cập nhật bởi cấp Tỉnh</p>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {/* Certificate Info */}
@@ -777,16 +767,16 @@ export default function SurveyDetailPage() {
                             </div>
                           </div>
                           {owner.ownership_share != null && owner.ownership_share > 0 && (
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-blue-600">
-                              {owner.ownership_share}%
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {owner.ownership_type === 'owner' ? 'Sở hữu' :
-                                owner.ownership_type === 'co_owner' ? 'Đồng sở hữu' : 'Đại diện'}
-                            </p>
-                          </div>
-                        )}
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-blue-600">
+                                {owner.ownership_share}%
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {owner.ownership_type === 'owner' ? 'Sở hữu' :
+                                  owner.ownership_type === 'co_owner' ? 'Đồng sở hữu' : 'Đại diện'}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -832,21 +822,7 @@ export default function SurveyDetailPage() {
                     </div>
                   </div>
 
-                  {/* Unlink Button */}
-                  {!isReadOnly && (
-                    <div className="flex justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleUnlinkParcel}
-                        disabled={parcelLinking}
-                        className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
-                      >
-                        <Unlink className="h-4 w-4" />
-                        {parcelLinking ? 'Đang xử lý...' : 'Hủy liên kết'}
-                      </Button>
-                    </div>
-                  )}
+                  {/* Commune officers cannot unlink - removed unlink button */}
                 </div>
               )}
             </CardContent>
@@ -863,7 +839,7 @@ export default function SurveyDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-500">
-                Thông tin liên hệ được ghi nhận tại hiện trường. Đây không phải chủ sở hữu chính thức
+                Thông tin liên hệ được ghi nhận tại địa điểm. Đây không phải chủ sở hữu chính thức
                 (thông tin chủ sở hữu được lấy từ giấy chứng nhận QSDĐ ở trên).
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1011,6 +987,10 @@ export default function SurveyDetailPage() {
                   showClustering={false}
                   enableDrawing={false}
                   entryPoints={entryPoints}
+                  wardBoundary={wardBoundary}
+                  restrictToWardBoundary={!!wardBoundary}
+                  showSearch={false}
+                  showInfoCard={false}
                 />
               </div>
             </CardContent>

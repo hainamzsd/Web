@@ -403,7 +403,7 @@ export class LocationIntelligence {
 
     if (reasons.some(r => r.includes('GPS'))) {
       recommendations.push('Khảo sát lại với thiết bị GPS chính xác hơn')
-      recommendations.push('Chụp ảnh hiện trường để xác minh')
+      recommendations.push('Chụp ảnh địa điểm để xác minh')
     }
 
     if (reasons.some(r => r.includes('diện tích'))) {

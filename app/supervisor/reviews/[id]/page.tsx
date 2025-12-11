@@ -79,7 +79,7 @@ export default function ReviewDetailPage() {
     if (!survey || !user) return
 
     const confirmed = window.confirm(
-      `Bạn có chắc muốn phê duyệt khảo sát "${survey.location_name || 'Chưa đặt tên'}"?`
+      `Bạn có chắc muốn phê duyệt khảo sát "${survey.location_name || 'Chưa đặt tên'}"?\nSau khi phê duyệt, khảo sát sẽ được chuyển lên Trung ương.`
     )
     if (!confirmed) return
 
@@ -89,7 +89,7 @@ export default function ReviewDetailPage() {
       const { data, error: updateError } = await supabase
         .from('survey_locations')
         .update({
-          status: 'approved_commune',
+          status: 'approved_province',
           updated_at: new Date().toISOString(),
         })
         .eq('id', survey.id)
@@ -109,12 +109,12 @@ export default function ReviewDetailPage() {
           actor_id: user.id,
           actor_role: webUser?.role || 'commune_supervisor',
           previous_status: survey.status,
-          new_status: 'approved_commune',
-          notes: notes || 'Đã phê duyệt bởi giám sát viên',
+          new_status: 'approved_province',
+          notes: notes || 'Đã phê duyệt bởi cấp Tỉnh',
         })
 
       toast.success('Phê duyệt thành công!', {
-        description: `Khảo sát "${survey.location_name || 'Chưa đặt tên'}" đã được phê duyệt.`,
+        description: `Khảo sát đã được phê duyệt và chuyển lên Trung ương.`,
         duration: 5000,
       })
 
@@ -191,11 +191,15 @@ export default function ReviewDetailPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800"><Clock className="h-3.5 w-3.5" />Chờ xử lý</span>
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800"><Clock className="h-3.5 w-3.5" />Chờ phê duyệt</span>
       case 'reviewed':
-        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"><FileText className="h-3.5 w-3.5" />Đã xem xét</span>
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-sky-100 text-sky-800"><Clock className="h-3.5 w-3.5" />Đã xem xét (cũ)</span>
+      case 'approved_province':
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"><CheckCircle2 className="h-3.5 w-3.5" />Đã duyệt (Tỉnh)</span>
       case 'approved_commune':
-        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800"><CheckCircle2 className="h-3.5 w-3.5" />Đã duyệt</span>
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800"><CheckCircle2 className="h-3.5 w-3.5" />Đã duyệt (Xã cũ)</span>
+      case 'approved_central':
+        return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800"><CheckCircle2 className="h-3.5 w-3.5" />Đã duyệt (TW)</span>
       case 'rejected':
         return <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800"><XCircle className="h-3.5 w-3.5" />Từ chối</span>
       default:
@@ -222,6 +226,7 @@ export default function ReviewDetailPage() {
     )
   }
 
+  // Tỉnh duyệt survey pending hoặc reviewed (backward compatibility)
   const canTakeAction = survey.status === 'pending' || survey.status === 'reviewed'
 
   return (
@@ -305,7 +310,7 @@ export default function ReviewDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-gray-500 italic">
-              Thông tin liên hệ ghi nhận tại hiện trường (không phải chủ sở hữu chính thức)
+              Thông tin liên hệ ghi nhận tại địa điểm (không phải chủ sở hữu chính thức)
             </p>
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <User className="h-5 w-5 text-gray-400" />
@@ -383,10 +388,10 @@ export default function ReviewDetailPage() {
 
       {/* Review Section */}
       {canTakeAction && (
-        <Card className="border-2 border-dashed">
+        <Card className="border-2 border-dashed border-teal-300 bg-teal-50/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Xem xét và phê duyệt</CardTitle>
-            <CardDescription>Nhập ghi chú (bắt buộc nếu từ chối) và chọn hành động</CardDescription>
+            <CardTitle className="text-base text-teal-700">Phê duyệt cấp Tỉnh</CardTitle>
+            <CardDescription>Nhập ghi chú (bắt buộc nếu từ chối). Sau khi phê duyệt, khảo sát sẽ chuyển lên Trung ương.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <textarea

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { Database } from '@/lib/types/database'
 import { EntryPoint, ENTRY_TYPE_LABELS } from '@/lib/types/entry-points'
-import { X, MapPin, User, Ruler, Navigation, Calendar, ExternalLink, Search, ArrowRight, Tag, Building, TrafficCone } from 'lucide-react'
+import { X, MapPin, User, Ruler, Navigation, Calendar, ExternalLink, Search, ArrowRight, Tag, Building, TrafficCone, Flag } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet-draw/dist/leaflet.draw.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
@@ -12,6 +12,22 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { createTrafficLightIcon, createTrafficLightPopup, getTrafficLightStatus, LocationIdentifierData } from './traffic-light-marker'
 
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
+
+// Vietnam islands data with proper Vietnamese names (sovereignty assertion)
+const VIETNAM_ISLANDS = {
+  hoangSa: {
+    name: 'Quần đảo Hoàng Sa',
+    nameEn: 'Paracel Islands',
+    center: [16.35, 112.0] as [number, number],
+    description: 'Thuộc chủ quyền Việt Nam'
+  },
+  truongSa: {
+    name: 'Quần đảo Trường Sa',
+    nameEn: 'Spratly Islands',
+    center: [9.0, 114.0] as [number, number],
+    description: 'Thuộc chủ quyền Việt Nam'
+  }
+}
 
 // Extended survey type with location identifier data for traffic lights
 export interface SurveyWithLocationId extends SurveyLocation {
@@ -35,6 +51,12 @@ interface EnhancedSurveyMapProps {
   baseDetailUrl?: string
   /** Location identifiers data for traffic light mode. Key is survey_location_id */
   locationIdentifiers?: Record<string, LocationIdentifierData>
+  /** GeoJSON data for ward boundary restriction */
+  wardBoundary?: any
+  /** Whether to restrict view to ward boundary (mask outside areas) */
+  restrictToWardBoundary?: boolean
+  /** Hide Vietnam-wide features like islands when showing ward only */
+  hideVietnamFeatures?: boolean
 }
 
 function EnhancedSurveyMapComponent({
@@ -52,7 +74,10 @@ function EnhancedSurveyMapComponent({
   height = '600px',
   showSearch = true,
   baseDetailUrl = '/commune/surveys',
-  locationIdentifiers = {}
+  locationIdentifiers = {},
+  wardBoundary,
+  restrictToWardBoundary = false,
+  hideVietnamFeatures = false
 }: EnhancedSurveyMapProps) {
   const mapRef = useRef<any>(null)
   const leafletRef = useRef<any>(null)
@@ -63,7 +88,13 @@ function EnhancedSurveyMapComponent({
   const polygonLayerRef = useRef<any>(null)
   const entryPointsLayerRef = useRef<any>(null)
   const trafficLightLayerRef = useRef<any>(null)
+  const vietnamBoundaryRef = useRef<any>(null)
+  const maskLayerRef = useRef<any>(null)
+  const islandsLayerRef = useRef<any>(null)
+  const wardBoundaryLayerRef = useRef<any>(null)
+  const wardMaskLayerRef = useRef<any>(null)
   const [mapMode, setMapMode] = useState<'markers' | 'heatmap' | 'clusters' | 'trafficLights'>('markers')
+  const [vietnamGeoJson, setVietnamGeoJson] = useState<any>(null)
   const [mapId] = useState(`enhanced-map-${Math.random().toString(36).substr(2, 9)}`)
   const [isMapReady, setIsMapReady] = useState(false)
   const [selectedSurvey, setSelectedSurvey] = useState<SurveyLocation | null>(null)
@@ -335,6 +366,20 @@ function EnhancedSurveyMapComponent({
     entryPointsLayerRef.current = entryPointsLayer
   }, [entryPoints, isMapReady])
 
+  // Load Vietnam GeoJSON
+  useEffect(() => {
+    const loadVietnamGeoJson = async () => {
+      try {
+        const response = await fetch('/vn.json')
+        const data = await response.json()
+        setVietnamGeoJson(data)
+      } catch (error) {
+        console.error('Failed to load Vietnam GeoJSON:', error)
+      }
+    }
+    loadVietnamGeoJson()
+  }, [])
+
   // Initialize map
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -356,10 +401,13 @@ function EnhancedSurveyMapComponent({
         center,
         zoom,
         zoomControl: true,
+        minZoom: 5,
+        maxZoom: 19,
       })
 
+      // Add tile layer
       leafletRef.current.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
+        attribution: '&copy; OpenStreetMap contributors | Bản đồ Việt Nam',
         maxZoom: 19,
         maxNativeZoom: 19,
       }).addTo(map)
@@ -443,6 +491,263 @@ function EnhancedSurveyMapComponent({
       }
     }
   }, [mapId])
+
+  // Add Vietnam boundary and mask outside areas
+  useEffect(() => {
+    if (!mapRef.current || !leafletRef.current || !isMapReady || !vietnamGeoJson) return
+
+    const L = leafletRef.current
+
+    // Clear existing layers
+    if (maskLayerRef.current) {
+      mapRef.current.removeLayer(maskLayerRef.current)
+      maskLayerRef.current = null
+    }
+    if (vietnamBoundaryRef.current) {
+      mapRef.current.removeLayer(vietnamBoundaryRef.current)
+      vietnamBoundaryRef.current = null
+    }
+    if (islandsLayerRef.current) {
+      mapRef.current.removeLayer(islandsLayerRef.current)
+      islandsLayerRef.current = null
+    }
+
+    // Skip Vietnam-wide features if we're restricting to ward boundary
+    if (restrictToWardBoundary && wardBoundary) return
+
+    // Create world bounds (large rectangle covering the map area)
+    const worldBounds: [number, number][] = [
+      [-90, -180],
+      [-90, 180],
+      [90, 180],
+      [90, -180],
+      [-90, -180]
+    ]
+
+    // Extract Vietnam coordinates from GeoJSON
+    const vietnamCoords: [number, number][][] = []
+
+    if (vietnamGeoJson.features) {
+      vietnamGeoJson.features.forEach((feature: any) => {
+        if (feature.geometry) {
+          if (feature.geometry.type === 'Polygon') {
+            vietnamCoords.push(
+              feature.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number])
+            )
+          } else if (feature.geometry.type === 'MultiPolygon') {
+            feature.geometry.coordinates.forEach((polygon: number[][][]) => {
+              vietnamCoords.push(
+                polygon[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number])
+              )
+            })
+          }
+        }
+      })
+    }
+
+    // Create mask polygon (world with Vietnam as holes)
+    if (vietnamCoords.length > 0) {
+      const maskCoords = [worldBounds, ...vietnamCoords]
+      const maskPolygon = L.polygon(maskCoords, {
+        color: 'transparent',
+        fillColor: '#f3f4f6',
+        fillOpacity: 0.9,
+        interactive: false
+      })
+      maskPolygon.addTo(mapRef.current)
+      maskLayerRef.current = maskPolygon
+
+      // Add Vietnam boundary outline
+      const boundaryLayer = L.geoJSON(vietnamGeoJson, {
+        style: {
+          color: '#dc2626',
+          weight: 2,
+          fillColor: 'transparent',
+          fillOpacity: 0,
+          dashArray: '5, 5'
+        }
+      })
+      boundaryLayer.addTo(mapRef.current)
+      vietnamBoundaryRef.current = boundaryLayer
+    }
+
+    // Add Hoàng Sa and Trường Sa with Vietnamese names (simplified - only archipelago boundaries)
+    const islandsLayer = L.layerGroup()
+
+    // Helper function to create archipelago label
+    const createArchipelagoLabel = (coords: number[], name: string, description: string) => {
+      const icon = L.divIcon({
+        className: 'vietnam-archipelago-marker',
+        html: `<div style="
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+            border: 2px solid #fef2f2;
+            text-align: center;
+          ">
+            <div style="display: flex; align-items: center; gap: 6px; justify-content: center;">
+              <span style="font-size: 16px;">🇻🇳</span>
+              ${name}
+            </div>
+            <div style="font-size: 10px; font-weight: 400; margin-top: 2px; opacity: 0.9;">
+              ${description}
+            </div>
+          </div>`,
+        iconSize: [200, 50],
+        iconAnchor: [100, 25],
+      })
+
+      return L.marker([coords[0], coords[1]], { icon, interactive: false })
+    }
+
+    // Add Hoàng Sa boundary and label
+    const hoangSaArea = L.polygon([
+      [17.2, 111.0],
+      [17.2, 113.0],
+      [15.5, 113.0],
+      [15.5, 111.0],
+    ], {
+      color: '#dc2626',
+      weight: 2,
+      fillColor: '#fef2f2',
+      fillOpacity: 0.3,
+      dashArray: '10, 5',
+      interactive: false
+    })
+    islandsLayer.addLayer(hoangSaArea)
+
+    const hoangSaLabel = createArchipelagoLabel(
+      VIETNAM_ISLANDS.hoangSa.center,
+      VIETNAM_ISLANDS.hoangSa.name,
+      VIETNAM_ISLANDS.hoangSa.description
+    )
+    islandsLayer.addLayer(hoangSaLabel)
+
+    // Add Trường Sa boundary and label
+    const truongSaArea = L.polygon([
+      [12.0, 111.0],
+      [12.0, 117.5],
+      [6.0, 117.5],
+      [6.0, 111.0],
+    ], {
+      color: '#dc2626',
+      weight: 2,
+      fillColor: '#fef2f2',
+      fillOpacity: 0.3,
+      dashArray: '10, 5',
+      interactive: false
+    })
+    islandsLayer.addLayer(truongSaArea)
+
+    const truongSaLabel = createArchipelagoLabel(
+      VIETNAM_ISLANDS.truongSa.center,
+      VIETNAM_ISLANDS.truongSa.name,
+      VIETNAM_ISLANDS.truongSa.description
+    )
+    islandsLayer.addLayer(truongSaLabel)
+
+    islandsLayer.addTo(mapRef.current)
+    islandsLayerRef.current = islandsLayer
+
+  }, [vietnamGeoJson, isMapReady, hideVietnamFeatures, restrictToWardBoundary, wardBoundary])
+
+  // Ward boundary mask effect - for commune officers
+  useEffect(() => {
+    if (!mapRef.current || !leafletRef.current || !isMapReady) return
+
+    const L = leafletRef.current
+
+    // Clear existing ward boundary layers
+    if (wardBoundaryLayerRef.current) {
+      mapRef.current.removeLayer(wardBoundaryLayerRef.current)
+      wardBoundaryLayerRef.current = null
+    }
+    if (wardMaskLayerRef.current) {
+      mapRef.current.removeLayer(wardMaskLayerRef.current)
+      wardMaskLayerRef.current = null
+    }
+
+    // If not restricting to ward or no ward boundary, skip
+    if (!restrictToWardBoundary || !wardBoundary) return
+
+    // Also hide Vietnam-wide layers when showing ward only
+    if (maskLayerRef.current) {
+      mapRef.current.removeLayer(maskLayerRef.current)
+      maskLayerRef.current = null
+    }
+    if (vietnamBoundaryRef.current) {
+      mapRef.current.removeLayer(vietnamBoundaryRef.current)
+      vietnamBoundaryRef.current = null
+    }
+    if (islandsLayerRef.current) {
+      mapRef.current.removeLayer(islandsLayerRef.current)
+      islandsLayerRef.current = null
+    }
+
+    // Create world bounds for mask
+    const worldBounds: [number, number][] = [
+      [-90, -180],
+      [-90, 180],
+      [90, 180],
+      [90, -180],
+      [-90, -180]
+    ]
+
+    // Extract ward coordinates from GeoJSON
+    const wardCoords: [number, number][][] = []
+
+    if (wardBoundary.geometry) {
+      // Single feature
+      if (wardBoundary.geometry.type === 'Polygon') {
+        wardCoords.push(
+          wardBoundary.geometry.coordinates[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number])
+        )
+      } else if (wardBoundary.geometry.type === 'MultiPolygon') {
+        wardBoundary.geometry.coordinates.forEach((polygon: number[][][]) => {
+          wardCoords.push(
+            polygon[0].map((coord: number[]) => [coord[1], coord[0]] as [number, number])
+          )
+        })
+      }
+    }
+
+    if (wardCoords.length > 0) {
+      // Create mask polygon (world with ward as hole)
+      const maskCoords = [worldBounds, ...wardCoords]
+      const maskPolygon = L.polygon(maskCoords, {
+        color: 'transparent',
+        fillColor: '#e5e7eb',
+        fillOpacity: 0.95,
+        interactive: false
+      })
+      maskPolygon.addTo(mapRef.current)
+      wardMaskLayerRef.current = maskPolygon
+
+      // Add ward boundary outline
+      const wardLayer = L.geoJSON(wardBoundary, {
+        style: {
+          color: '#2563eb',
+          weight: 3,
+          fillColor: 'transparent',
+          fillOpacity: 0,
+          dashArray: '0'
+        }
+      })
+      wardLayer.addTo(mapRef.current)
+      wardBoundaryLayerRef.current = wardLayer
+
+      // Fit bounds to ward
+      const bounds = wardLayer.getBounds()
+      if (bounds.isValid()) {
+        mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 })
+      }
+    }
+  }, [wardBoundary, restrictToWardBoundary, isMapReady])
 
   // Update map based on mode
   useEffect(() => {
@@ -848,106 +1153,37 @@ function EnhancedSurveyMapComponent({
 
       <div id={mapId} className="absolute inset-0 w-full h-full z-0"></div>
 
-      {/* Map Controls - Top Right */}
-      <div className="absolute top-3 right-3 z-[1000] bg-white rounded-lg shadow-lg p-2 space-y-2">
-        <button
-          onClick={() => setMapMode('markers')}
-          className={`w-full px-4 py-2 rounded text-sm font-medium transition-colors ${mapMode === 'markers'
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-        >
-          Điểm đánh dấu
-        </button>
-        <button
-          onClick={() => setMapMode('clusters')}
-          className={`w-full px-4 py-2 rounded text-sm font-medium transition-colors ${mapMode === 'clusters'
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-        >
-          Nhóm cụm
-        </button>
-        <button
-          onClick={() => setMapMode('heatmap')}
-          className={`w-full px-4 py-2 rounded text-sm font-medium transition-colors ${mapMode === 'heatmap'
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-        >
-          Bản đồ nhiệt
-        </button>
-        <div className="border-t border-gray-200 my-1"></div>
-        <button
-          onClick={() => setMapMode('trafficLights')}
-          className={`w-full px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2 ${mapMode === 'trafficLights'
-            ? 'bg-gradient-to-r from-red-500 to-green-500 text-white'
-            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-        >
-          <TrafficCone className="h-4 w-4" />
-          Mã định danh
-        </button>
-      </div>
+      {/* Map Controls removed - always use markers mode */}
 
       {/* Legend - Bottom Right */}
       <div className="absolute bottom-3 right-3 z-[1000] bg-white rounded-lg shadow-lg p-3 max-h-[200px] overflow-y-auto">
-        {mapMode === 'trafficLights' ? (
-          <>
-            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-              <TrafficCone className="h-4 w-4" />
-              Trạng thái mã định danh
-            </h4>
-            <p className="text-[10px] text-gray-500 mb-2">Chỉ hiển thị vị trí đã được cấp mã</p>
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center gap-3 p-1.5 bg-green-50 rounded">
-                <div className="w-4 h-4 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-                <div>
-                  <span className="font-medium text-green-700">Xanh</span>
-                  <p className="text-green-600 text-[10px]">Đang hoạt động</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-1.5 bg-red-50 rounded">
-                <div className="w-4 h-4 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
-                <div>
-                  <span className="font-medium text-red-700">Đỏ</span>
-                  <p className="text-red-600 text-[10px]">Đã vô hiệu hóa</p>
-                </div>
-              </div>
-            </div>
-            <p className="text-[10px] text-gray-400 mt-2 italic">Mã định danh hiển thị dưới đèn</p>
-          </>
-        ) : (
-          <>
-            <h4 className="font-semibold text-sm mb-2">Trạng thái khảo sát</h4>
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                <span>Chờ xử lý</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-sky-500"></div>
-                <span>Đã xem xét</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                <span>Đã duyệt xã</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span>Đã duyệt TW</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span>Đã công bố</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <span>Từ chối</span>
-              </div>
-            </div>
-          </>
-        )}
+        <h4 className="font-semibold text-sm mb-2">Trạng thái khảo sát</h4>
+        <div className="space-y-1 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+            <span>Chờ xử lý</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-sky-500"></div>
+            <span>Đã xem xét</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+            <span>Đã duyệt xã</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+            <span>Đã duyệt TW</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <span>Đã công bố</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            <span>Từ chối</span>
+          </div>
+        </div>
         {entryPoints.length > 0 && (
           <>
             <hr className="my-2 border-gray-200" />
@@ -965,6 +1201,59 @@ function EnhancedSurveyMapComponent({
           </>
         )}
       </div>
+
+      {/* Vietnam Sovereignty Legend - Bottom Left (hide when showing ward boundary only) */}
+      {!restrictToWardBoundary && (
+        <div className="absolute bottom-3 left-3 z-[1000] bg-white rounded-lg shadow-lg p-3 max-w-[200px]">
+          <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-red-700">
+            <Flag className="h-4 w-4" />
+            Lãnh thổ Việt Nam
+          </h4>
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 border-2 border-red-600 border-dashed"></div>
+              <span>Biên giới Việt Nam</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-red-100 border border-red-600"></div>
+              <span>Vùng biển đảo</span>
+            </div>
+            <div className="pt-1 border-t border-gray-100 mt-1">
+              <p className="text-[10px] text-gray-500 leading-relaxed">
+                Hoàng Sa và Trường Sa thuộc chủ quyền Việt Nam
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ward Boundary Legend - Bottom Left (show when restricting to ward) */}
+      {restrictToWardBoundary && wardBoundary && (
+        <div className="absolute bottom-3 left-3 z-[1000] bg-white rounded-lg shadow-lg p-3 max-w-[220px]">
+          <h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-blue-700">
+            <MapPin className="h-4 w-4" />
+            Địa bàn quản lý
+          </h4>
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 border-2 border-blue-600"></div>
+              <span>Ranh giới xã/phường</span>
+            </div>
+            {wardBoundary.properties?.ten_xa && (
+              <div className="pt-1 border-t border-gray-100 mt-1">
+                <p className="text-[11px] font-medium text-gray-700">
+                  {wardBoundary.properties.ten_xa}
+                </p>
+                {wardBoundary.properties?.ten_tinh && (
+                  <p className="text-[10px] text-gray-500">
+                    {wardBoundary.properties.ten_tinh}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Info Card - Left Side */}
       {showInfoCard && selectedSurvey && (

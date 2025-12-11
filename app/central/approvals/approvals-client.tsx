@@ -1,16 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/lib/auth/auth-context'
-import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, MapPin, Eye, XCircle } from 'lucide-react'
-import { RejectSurveyModal, RejectionData } from '@/components/survey/reject-survey-modal'
+import { Eye, MapPin, FileCheck, AlertTriangle, Search } from 'lucide-react'
 import Link from 'next/link'
 import { Database } from '@/lib/types/database'
-import { toast } from 'sonner'
 
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 
@@ -19,161 +14,22 @@ interface ApprovalsClientProps {
 }
 
 export function ApprovalsClient({ initialSurveys }: ApprovalsClientProps) {
-  const { webUser, user } = useAuth()
-  const [surveys, setSurveys] = useState<SurveyLocation[]>(initialSurveys)
-  const [processing, setProcessing] = useState<string | null>(null)
-  const [rejectingSurvey, setRejectingSurvey] = useState<SurveyLocation | null>(null)
-  const supabase = createClient()
+  const [searchTerm, setSearchTerm] = useState('')
 
-  /**
-   * Generate location identifier with random number
-   * Format: PPWWWWNNNNNN (12 digits, no dashes)
-   * - PP: Province code (2 digits, zero-padded)
-   * - WWWW: Ward code (4 digits, zero-padded)
-   * - NNNNNN: Random number (6 digits)
-   */
-  const handleApprove = async (survey: SurveyLocation) => {
-    if (!user) return
-    setProcessing(survey.id)
+  // Filter surveys by search term
+  const filteredSurveys = initialSurveys.filter(survey => {
+    if (!searchTerm) return true
+    const search = searchTerm.toLowerCase()
+    return (
+      survey.location_name?.toLowerCase().includes(search) ||
+      survey.address?.toLowerCase().includes(search) ||
+      survey.parcel_code?.toLowerCase().includes(search)
+    )
+  })
 
-    try {
-      const provinceCode = (survey.province_id || 0).toString().padStart(2, '0')
-      const wardCode = (survey.ward_id || 0).toString().padStart(4, '0')
-      const adminCode = `${provinceCode}${wardCode}`
-
-      // Generate random number and retry if duplicate
-      const maxRetries = 10
-      let locationId: string | null = null
-      let inserted = false
-
-      for (let attempt = 0; attempt < maxRetries && !inserted; attempt++) {
-        const randomNum = Math.floor(Math.random() * 999999) + 1
-        const randomStr = randomNum.toString().padStart(6, '0')
-        locationId = `${adminCode}${randomStr}`
-
-        const { error: insertError } = await supabase
-          .from('location_identifiers')
-          .insert({
-            survey_location_id: survey.id,
-            location_id: locationId,
-            admin_code: adminCode,
-            sequence_number: randomStr,
-            assigned_by: user.id,
-          })
-
-        if (!insertError) {
-          inserted = true
-        } else if (insertError.code !== '23505') {
-          throw insertError
-        }
-        // If duplicate (23505), loop will retry with new random number
-      }
-
-      if (!inserted || !locationId) {
-        throw new Error('Không thể tạo mã định danh sau nhiều lần thử')
-      }
-
-      // Update survey_locations with new status and location_identifier
-      const { error: updateError } = await supabase
-        .from('survey_locations')
-        .update({
-          status: 'approved_central',
-          location_identifier: locationId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', survey.id)
-
-      if (updateError) throw updateError
-
-      // Log approval history
-      const { error: historyError } = await supabase
-        .from('approval_history')
-        .insert({
-          survey_location_id: survey.id,
-          action: 'approved',
-          actor_id: user.id,
-          actor_role: webUser?.role || 'central_admin',
-          previous_status: survey.status,
-          new_status: 'approved_central',
-          notes: `Đã phê duyệt cấp trung ương. Mã định danh: ${locationId}`,
-        })
-
-      if (historyError) throw historyError
-
-      setSurveys(surveys.filter(s => s.id !== survey.id))
-      toast.success("Thành công", {
-        description: `Đã phê duyệt! Mã định danh: ${locationId}`,
-      })
-    } catch (error: any) {
-      console.error('Error approving survey:', error)
-      toast.error("Lỗi", {
-        description: error?.message || "Lỗi khi phê duyệt!",
-      })
-    } finally {
-      setProcessing(null)
-    }
-  }
-
-  const handleReject = async (rejectionData: RejectionData) => {
-    if (!rejectingSurvey || !user) return
-    setProcessing(rejectingSurvey.id)
-
-    try {
-      // Build rejection notes with reason
-      let rejectionNotes = `[${rejectionData.reasonLabel}]`
-      if (rejectionData.customReason) {
-        rejectionNotes += ` ${rejectionData.customReason}`
-      }
-      if (rejectionData.notes) {
-        rejectionNotes += ` - ${rejectionData.notes}`
-      }
-
-      const { error: updateError } = await supabase
-        .from('survey_locations')
-        .update({
-          status: 'rejected',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', rejectingSurvey.id)
-
-      if (updateError) throw updateError
-
-      // Store rejection data in metadata for easier parsing on app side
-      const metadata = {
-        rejection_reason_id: rejectionData.reasonId,
-        rejection_reason_label: rejectionData.reasonLabel,
-        rejection_custom_reason: rejectionData.customReason || null,
-        rejection_additional_notes: rejectionData.notes || null
-      }
-
-      const { error: historyError } = await supabase
-        .from('approval_history')
-        .insert({
-          survey_location_id: rejectingSurvey.id,
-          action: 'rejected',
-          actor_id: user.id,
-          actor_role: webUser?.role || 'central_admin',
-          previous_status: rejectingSurvey.status,
-          new_status: 'rejected',
-          notes: rejectionNotes,
-          metadata: metadata,
-        })
-
-      if (historyError) throw historyError
-
-      setSurveys(surveys.filter(s => s.id !== rejectingSurvey.id))
-      setRejectingSurvey(null)
-      toast.success("Thành công", {
-        description: "Đã từ chối khảo sát!",
-      })
-    } catch (error) {
-      console.error('Error rejecting survey:', error)
-      toast.error("Lỗi", {
-        description: "Lỗi khi từ chối!",
-      })
-    } finally {
-      setProcessing(null)
-    }
+  // Check if survey has land parcel linked
+  const hasLandParcel = (survey: SurveyLocation) => {
+    return !!survey.land_parcel_id && !!survey.parcel_verified_at
   }
 
   return (
@@ -181,99 +37,112 @@ export function ApprovalsClient({ initialSurveys }: ApprovalsClientProps) {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Phê duyệt Trung ương</h1>
         <p className="text-gray-500 mt-1">
-          Phê duyệt và cấp mã định danh cho các khảo sát
+          Tra cứu thửa đất và cấp mã định danh cho các khảo sát đã được Tỉnh phê duyệt
         </p>
       </div>
 
+      {/* Workflow Info */}
+      <Card className="bg-indigo-50 border-indigo-200">
+        <CardContent className="py-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-indigo-600 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-indigo-900">Quy trình phê duyệt TW</h4>
+              <p className="text-sm text-indigo-700 mt-1">
+                1. Xem chi tiết khảo sát → 2. Tra cứu và liên kết thửa đất → 3. Phê duyệt và cấp mã định danh
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
-          <CardTitle>Chờ phê duyệt ({surveys.length})</CardTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Chờ phê duyệt ({filteredSurveys.length})</CardTitle>
+              <CardDescription>Nhấn "Xem chi tiết" để tra cứu thửa đất và phê duyệt</CardDescription>
+            </div>
+            {/* Search */}
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Tìm theo tên, địa chỉ..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {surveys.length === 0 ? (
+          {filteredSurveys.length === 0 ? (
             <p className="text-center text-gray-500 py-8">
-              Không có khảo sát nào chờ phê duyệt
+              {searchTerm ? 'Không tìm thấy kết quả' : 'Không có khảo sát nào chờ phê duyệt'}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">
-                      Tên vị trí
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">
-                      Địa chỉ
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">
-                      Mã vùng (Tỉnh-Xã)
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">
-                      Chủ sở hữu
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">
-                      Trạng thái
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">
-                      Thao tác
-                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Tên vị trí</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Địa chỉ</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Mã vùng</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Thửa đất</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Trạng thái</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {surveys.map((survey) => (
-                    <tr key={survey.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        {survey.location_name || 'Chưa đặt tên'}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">
-                        {survey.address || 'Chưa có địa chỉ'}
-                      </td>
-                      <td className="py-3 px-4 text-sm font-mono">
-                        {survey.province_id?.toString().padStart(2, '0') || '??'}-{survey.ward_id?.toString().padStart(4, '0') || '????'}
-                      </td>
-                      <td className="py-3 px-4 text-sm">
-                        {survey.owner_name || '-'}
-                      </td>
-                      <td className="py-3 px-4">
-                        <StatusBadge status={survey.status} />
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
+                  {filteredSurveys.map((survey) => {
+                    const linked = hasLandParcel(survey)
+                    return (
+                      <tr key={survey.id} className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <div className="font-medium">{survey.location_name || 'Chưa đặt tên'}</div>
+                          {survey.parcel_code && (
+                            <div className="text-xs text-gray-500 font-mono mt-0.5">
+                              Thửa: {survey.parcel_code}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-600 max-w-xs truncate">
+                          {survey.address || 'Chưa có địa chỉ'}
+                        </td>
+                        <td className="py-3 px-4 text-sm font-mono">
+                          {survey.province_id?.toString().padStart(2, '0') || '??'}-
+                          {survey.ward_id?.toString().padStart(4, '0') || '????'}
+                        </td>
+                        <td className="py-3 px-4">
+                          {linked ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <FileCheck className="h-3 w-3" />
+                              Đã liên kết
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                              <AlertTriangle className="h-3 w-3" />
+                              Chưa liên kết
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {survey.status === 'approved_commune' ? 'Đã duyệt (Xã cũ)' : 'Đã duyệt (Tỉnh)'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
                           <Link href={`/central/surveys/${survey.id}`}>
-                            <Button size="sm" variant="outline" className="gap-1">
+                            <Button size="sm" className="gap-1 bg-indigo-600 hover:bg-indigo-700">
                               <Eye className="h-4 w-4" />
-                              Xem
+                              Xem chi tiết
                             </Button>
                           </Link>
-                          <Button
-                            onClick={() => handleApprove(survey)}
-                            disabled={processing === survey.id}
-                            size="sm"
-                            className="gap-1 bg-green-600 hover:bg-green-700"
-                          >
-                            {processing === survey.id ? (
-                              <>Đang xử lý...</>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-4 w-4" />
-                                Duyệt
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            onClick={() => setRejectingSurvey(survey)}
-                            disabled={processing === survey.id}
-                            size="sm"
-                            variant="destructive"
-                            className="gap-1"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            Từ chối
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -292,28 +161,16 @@ export function ApprovalsClient({ initialSurveys }: ApprovalsClientProps) {
           <div className="space-y-2 text-sm">
             <p><strong>Format:</strong> PPWWWWNNNNNN (12 chữ số)</p>
             <ul className="list-disc list-inside space-y-1 text-gray-600">
-              <li><strong>PP:</strong> Mã tỉnh (2 chữ số, ví dụ: 04, 23)</li>
-              <li><strong>WWWW:</strong> Mã xã (4 chữ số, ví dụ: 0028, 1234)</li>
+              <li><strong>PP:</strong> Mã tỉnh (2 chữ số)</li>
+              <li><strong>WWWW:</strong> Mã xã (4 chữ số)</li>
               <li><strong>NNNNNN:</strong> Số ngẫu nhiên (6 chữ số)</li>
             </ul>
-            <p className="mt-2 text-gray-600">
-              Ví dụ: <code className="bg-gray-100 px-2 py-1 rounded font-mono">040028847291</code>
-            </p>
-            <p className="text-xs text-gray-500 mt-2">
-              Số ngẫu nhiên được tạo tự động và đảm bảo không trùng lặp
+            <p className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+              <strong>Lưu ý:</strong> Phải tra cứu và liên kết thửa đất trong màn hình chi tiết trước khi có thể cấp mã định danh.
             </p>
           </div>
         </CardContent>
       </Card>
-
-      {/* Reject Survey Modal */}
-      <RejectSurveyModal
-        isOpen={!!rejectingSurvey}
-        onClose={() => setRejectingSurvey(null)}
-        onConfirm={handleReject}
-        surveyName={rejectingSurvey?.location_name || 'Chưa đặt tên'}
-        isLoading={processing === rejectingSurvey?.id}
-      />
     </div>
   )
 }
