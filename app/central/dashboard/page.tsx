@@ -12,7 +12,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 export default function CentralDashboardPage() {
   const [stats, setStats] = useState({
     totalSurveys: 0, pendingApprovals: 0, assignedIds: 0, activeUsers: 0,
-    pendingCentral: 0, published: 0, rejected: 0, thisMonth: 0, lastMonth: 0
+    approved_central: 0, rejected: 0, thisMonth: 0, lastMonth: 0
   })
   const [provinceData, setProvinceData] = useState<{ name: string; surveys: number; approved: number }[]>([])
   const [monthlyData, setMonthlyData] = useState<{ month: string; surveys: number; approved: number }[]>([])
@@ -39,27 +39,27 @@ export default function CentralDashboardPage() {
       const counts = surveys.reduce((acc, item) => {
         const createdAt = new Date(item.created_at)
         acc.totalSurveys++
-        if (item.status === 'approved_commune' || item.status === 'approved_province') acc.pendingCentral++
-        else if (item.status === 'approved_central' || item.status === 'published') acc.published++
+        if (item.status === 'approved_commune' || item.status === 'approved_province') acc.pendingApprovals++
+        else if (item.status === 'approved_central') acc.approved_central++
         else if (item.status === 'rejected') acc.rejected++
         if (createdAt >= firstDayThisMonth) acc.thisMonth++
         else if (createdAt >= firstDayLastMonth && createdAt < firstDayThisMonth) acc.lastMonth++
         return acc
-      }, { totalSurveys: 0, pendingCentral: 0, published: 0, rejected: 0, thisMonth: 0, lastMonth: 0 })
+      }, { totalSurveys: 0, pendingApprovals: 0, approved_central: 0, rejected: 0, thisMonth: 0, lastMonth: 0 })
 
       setStats({
         ...counts,
-        pendingApprovals: counts.pendingCentral,
+        pendingApprovals: counts.pendingApprovals,
         assignedIds: locationIds?.length || 0,
         activeUsers: users?.length || 0,
       })
 
       // Status distribution for pie chart
       setStatusDistribution([
-        { name: 'Đã công bố', value: counts.published, color: '#10b981' },
-        { name: 'Chờ duyệt', value: counts.pendingCentral, color: '#f59e0b' },
+        { name: 'Đã công bố', value: counts.approved_central, color: '#10b981' },
+        { name: 'Chờ duyệt', value: counts.pendingApprovals, color: '#f59e0b' },
         { name: 'Từ chối', value: counts.rejected, color: '#ef4444' },
-        { name: 'Khác', value: counts.totalSurveys - counts.published - counts.pendingCentral - counts.rejected, color: '#6b7280' },
+        { name: 'Khác', value: counts.totalSurveys - counts.approved_central - counts.pendingApprovals - counts.rejected, color: '#6b7280' },
       ])
 
       // Monthly trends
@@ -73,7 +73,7 @@ export default function CentralDashboardPage() {
         return {
           month: date.toLocaleDateString('vi-VN', { month: 'short' }),
           surveys: monthSurveys.length,
-          approved: monthSurveys.filter(s => s.status === 'approved_central' || s.status === 'published').length
+          approved: monthSurveys.filter(s => s.status === 'approved_central').length
         }
       })
       setMonthlyData(monthlyTrends)
@@ -84,7 +84,7 @@ export default function CentralDashboardPage() {
         const code = survey.province_code?.substring(0, 2) || 'Unknown'
         const existing = provinceMap.get(code) || { total: 0, approved: 0 }
         existing.total++
-        if (survey.status === 'approved_central' || survey.status === 'published') existing.approved++
+        if (survey.status === 'approved_central') existing.approved++
         provinceMap.set(code, existing)
       })
 
@@ -105,14 +105,13 @@ export default function CentralDashboardPage() {
     ? ((stats.thisMonth - stats.lastMonth) / stats.lastMonth * 100).toFixed(1)
     : stats.thisMonth > 0 ? '100' : '0'
   const isGrowing = parseFloat(monthlyGrowth) >= 0
-  const completionRate = stats.totalSurveys > 0 ? ((stats.published / stats.totalSurveys) * 100).toFixed(1) : '0'
+  const completionRate = stats.totalSurveys > 0 ? ((stats.approved_central / stats.totalSurveys) * 100).toFixed(1) : '0'
 
   const getStatusConfig = (status: string) => {
     const configs: Record<string, { bg: string; text: string; label: string }> = {
-      'published': { bg: 'bg-emerald-500/20', text: 'text-emerald-400', label: 'Đã công bố' },
-      'approved_central': { bg: 'bg-blue-500/20', text: 'text-blue-400', label: 'Đã duyệt TW' },
-      'approved_commune': { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Chờ duyệt TW' },
-      'approved_province': { bg: 'bg-purple-500/20', text: 'text-purple-400', label: 'Chờ duyệt TW' },
+      'approved_central': { bg: 'bg-emerald-500/20', text: 'text-emerald-400', label: 'Đã công bố' },
+      'approved_commune': { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Chờ duyệt Tỉnh' },
+      'approved_province': { bg: 'bg-blue-500/20', text: 'text-blue-400', label: 'Chờ duyệt TW' },
       'rejected': { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Từ chối' },
       'pending': { bg: 'bg-slate-500/20', text: 'text-slate-400', label: 'Chờ xử lý' },
     }
@@ -226,7 +225,7 @@ export default function CentralDashboardPage() {
               </div>
               <Award className="h-5 w-5 text-emerald-400/50" />
             </div>
-            <div className="text-3xl font-bold text-white mb-1">{stats.published.toLocaleString()}</div>
+            <div className="text-3xl font-bold text-white mb-1">{stats.approved_central.toLocaleString()}</div>
             <div className="text-sm text-slate-400">Đã công bố</div>
             <div className="mt-3 text-xs text-emerald-400 font-medium">Hoàn tất xử lý</div>
           </div>

@@ -103,7 +103,7 @@ function EnhancedSurveyMapComponent({
   const [isSearching, setIsSearching] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
 
-  // Search function - search by location_identifier, location_name, address, owner_name
+  // Search function - search by location_identifier, location_name, address, representative_name
   const handleSearch = useCallback(() => {
     if (!searchQuery.trim()) {
       setSearchResults([])
@@ -122,7 +122,7 @@ function EnhancedSurveyMapComponent({
       // Search by address
       if (survey.address?.toLowerCase().includes(query)) return true
       // Search by owner name
-      if (survey.owner_name?.toLowerCase().includes(query)) return true
+      if (survey.representative_name?.toLowerCase().includes(query)) return true
       return false
     })
 
@@ -218,7 +218,7 @@ function EnhancedSurveyMapComponent({
             <p style="font-size: 12px; color: #666;">
               Diện tích: ${selectedSurvey.land_area_m2 ? selectedSurvey.land_area_m2.toLocaleString('vi-VN') + ' m²' : 'Chưa xác định'}
             </p>
-            ${selectedSurvey.owner_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${selectedSurvey.owner_name}</p>` : ''}
+            ${selectedSurvey.representative_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${selectedSurvey.representative_name}</p>` : ''}
           </div>
         `)
 
@@ -824,8 +824,8 @@ function EnhancedSurveyMapComponent({
         validSurveys.forEach(survey => {
           const marker = L.marker([survey.latitude!, survey.longitude!])
           const statusColor =
-            survey.status === 'published' ? '#10b981' :
-              survey.status === 'approved_central' ? '#3b82f6' :
+            survey.status === 'approved_central' ? '#3b82f6' :
+              survey.status === 'approved_province' ? '#10b981' :
                 survey.status === 'approved_commune' ? '#8b5cf6' :
                   survey.status === 'reviewed' ? '#0ea5e9' :
                     survey.status === 'rejected' ? '#ef4444' :
@@ -844,7 +844,7 @@ function EnhancedSurveyMapComponent({
               <p style="font-size: 11px; color: #999;">
                 Trạng thái: <strong style="color: ${statusColor};">${survey.status}</strong>
               </p>
-              ${survey.owner_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${survey.owner_name}</p>` : ''}
+              ${survey.representative_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${survey.representative_name}</p>` : ''}
               ${hasPolygon ? '<p style="font-size: 11px; color: #3b82f6;">📐 Có dữ liệu ranh giới</p>' : ''}
               <a href="${baseDetailUrl}/${survey.id}" style="color: #3b82f6; text-decoration: underline; font-size: 12px;">
                 Xem chi tiết →
@@ -871,7 +871,7 @@ function EnhancedSurveyMapComponent({
 
         // Filter surveys that have location identifiers
         const surveysWithLocationId = validSurveys.filter(survey => {
-          const locationId = survey.location_identifier || survey.final_location_id
+          const locationId = survey.location_identifier
           return locationId && locationIdentifiers[survey.id]
         })
 
@@ -948,8 +948,8 @@ function EnhancedSurveyMapComponent({
 
         validSurveys.forEach(survey => {
           const statusColor =
-            survey.status === 'published' ? '#10b981' :
-              survey.status === 'approved_central' ? '#3b82f6' :
+            survey.status === 'approved_central' ? '#3b82f6' :
+              survey.status === 'approved_province' ? '#10b981' :
                 survey.status === 'approved_commune' ? '#8b5cf6' :
                   survey.status === 'reviewed' ? '#0ea5e9' :
                     survey.status === 'rejected' ? '#ef4444' :
@@ -990,7 +990,7 @@ function EnhancedSurveyMapComponent({
               <p style="font-size: 11px; color: #999;">
                 Trạng thái: <strong style="color: ${statusColor};">${survey.status}</strong>
               </p>
-              ${survey.owner_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${survey.owner_name}</p>` : ''}
+              ${survey.representative_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${survey.representative_name}</p>` : ''}
               ${hasPolygon ? '<p style="font-size: 11px; color: #3b82f6;">📐 Có dữ liệu ranh giới</p>' : ''}
               <a href="${baseDetailUrl}/${survey.id}" style="color: #3b82f6; text-decoration: underline; font-size: 12px;">
                 Xem chi tiết →
@@ -1034,8 +1034,8 @@ function EnhancedSurveyMapComponent({
       pending: 'Chờ xử lý',
       reviewed: 'Đã xem xét',
       approved_commune: 'Đã duyệt (Xã)',
+      approved_province: 'Đã duyệt (Tỉnh)',
       approved_central: 'Đã duyệt (TW)',
-      published: 'Đã công bố',
       rejected: 'Từ chối'
     }
     return labels[status] || status
@@ -1046,8 +1046,8 @@ function EnhancedSurveyMapComponent({
       pending: 'bg-amber-100 text-amber-700',
       reviewed: 'bg-sky-100 text-sky-700',
       approved_commune: 'bg-purple-100 text-purple-700',
+      approved_province: 'bg-green-100 text-green-700',
       approved_central: 'bg-blue-100 text-blue-700',
-      published: 'bg-green-100 text-green-700',
       rejected: 'bg-red-100 text-red-700'
     }
     return colors[status] || 'bg-gray-100 text-gray-700'
@@ -1108,12 +1108,11 @@ function EnhancedSurveyMapComponent({
                         onClick={() => goToSurvey(survey)}
                         className="w-full px-4 py-3 hover:bg-blue-50 flex items-start gap-3 border-b border-gray-100 last:border-0 transition-colors text-left"
                       >
-                        <div className={`mt-0.5 w-3 h-3 rounded-full flex-shrink-0 ${
-                          survey.status === 'published' ? 'bg-green-500' :
-                          survey.status === 'approved_central' ? 'bg-blue-500' :
-                          survey.status === 'approved_commune' ? 'bg-purple-500' :
-                          survey.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500'
-                        }`} />
+                        <div className={`mt-0.5 w-3 h-3 rounded-full flex-shrink-0 ${survey.status === 'approved_central' ? 'bg-blue-500' :
+                          survey.status === 'approved_province' ? 'bg-green-500' :
+                            survey.status === 'approved_commune' ? 'bg-purple-500' :
+                              survey.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500'
+                          }`} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm text-gray-900 truncate">
@@ -1128,9 +1127,9 @@ function EnhancedSurveyMapComponent({
                           <p className="text-xs text-gray-500 truncate mt-0.5">
                             {survey.address || 'Chưa có địa chỉ'}
                           </p>
-                          {survey.owner_name && (
+                          {survey.representative_name && (
                             <p className="text-xs text-gray-400 truncate">
-                              Chủ: {survey.owner_name}
+                              Chủ: {survey.representative_name}
                             </p>
                           )}
                         </div>
@@ -1297,12 +1296,12 @@ function EnhancedSurveyMapComponent({
 
             {/* Quick Info Grid */}
             <div className="grid grid-cols-1 gap-3">
-              {selectedSurvey.owner_name && (
+              {selectedSurvey.representative_name && (
                 <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                   <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-gray-500">Chủ sở hữu</p>
-                    <p className="text-sm font-medium truncate">{selectedSurvey.owner_name}</p>
+                    <p className="text-sm font-medium truncate">{selectedSurvey.representative_name}</p>
                   </div>
                 </div>
               )}

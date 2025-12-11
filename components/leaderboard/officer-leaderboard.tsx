@@ -48,7 +48,7 @@ export function OfficerLeaderboard({ scope = 'commune', wardId, provinceId, limi
             photos,
             location_name,
             address,
-            owner_name,
+            representative_name,
             profiles!inner(id, full_name, police_id)
           `)
 

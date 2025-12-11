@@ -101,7 +101,7 @@ export function VietmapSurveyMap({
       if (survey.location_identifier?.toLowerCase().includes(query)) return true
       if (survey.location_name?.toLowerCase().includes(query)) return true
       if (survey.address?.toLowerCase().includes(query)) return true
-      if (survey.owner_name?.toLowerCase().includes(query)) return true
+      if (survey.representative_name?.toLowerCase().includes(query)) return true
       return false
     })
 
@@ -152,7 +152,7 @@ export function VietmapSurveyMap({
             return [point.lng || point.longitude || 0, point.lat || point.latitude || 0]
           }
           return [0, 0]
-        })
+        }) as [number, number][]
         return [converted]
       }
     } catch (e) {
@@ -632,11 +632,10 @@ export function VietmapSurveyMap({
                 <button
                   key={styleKey}
                   onClick={() => changeStyle(styleKey)}
-                  className={`w-full px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
-                    currentStyle === styleKey
+                  className={`w-full px-3 py-2 text-sm flex items-center gap-2 transition-colors ${currentStyle === styleKey
                       ? 'bg-blue-50 text-blue-700'
                       : 'text-gray-700 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   {STYLE_OPTIONS[styleKey].icon}
                   {STYLE_OPTIONS[styleKey].name}
@@ -659,7 +658,7 @@ export function VietmapSurveyMap({
           className={`w-full px-4 py-2 rounded text-sm font-medium transition-colors ${mapMode === 'markers'
             ? 'bg-blue-600 text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
+            }`}
         >
           Điểm đánh dấu
         </button>
@@ -668,7 +667,7 @@ export function VietmapSurveyMap({
           className={`w-full px-4 py-2 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2 ${mapMode === 'trafficLights'
             ? 'bg-gradient-to-r from-red-500 to-green-500 text-white'
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
+            }`}
         >
           <TrafficCone className="h-4 w-4" />
           Mã định danh
@@ -760,14 +759,12 @@ export function VietmapSurveyMap({
             </div>
 
             {locationIdentifiers[selectedSurvey.id] && (
-              <div className={`flex items-center gap-2 p-2 rounded-lg ${
-                locationIdentifiers[selectedSurvey.id].is_active
+              <div className={`flex items-center gap-2 p-2 rounded-lg ${locationIdentifiers[selectedSurvey.id].is_active
                   ? 'bg-green-50 text-green-700'
                   : 'bg-red-50 text-red-700'
-              }`}>
-                <div className={`w-3 h-3 rounded-full ${
-                  locationIdentifiers[selectedSurvey.id].is_active ? 'bg-green-500' : 'bg-red-500'
-                }`}></div>
+                }`}>
+                <div className={`w-3 h-3 rounded-full ${locationIdentifiers[selectedSurvey.id].is_active ? 'bg-green-500' : 'bg-red-500'
+                  }`}></div>
                 <div>
                   <span className="text-xs font-medium">
                     Mã: {locationIdentifiers[selectedSurvey.id].location_id}
@@ -780,12 +777,12 @@ export function VietmapSurveyMap({
             )}
 
             <div className="grid grid-cols-1 gap-2">
-              {selectedSurvey.owner_name && (
+              {selectedSurvey.representative_name && (
                 <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                   <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-gray-500">Chủ sở hữu</p>
-                    <p className="text-sm font-medium truncate">{selectedSurvey.owner_name}</p>
+                    <p className="text-sm font-medium truncate">{selectedSurvey.representative_name}</p>
                   </div>
                 </div>
               )}

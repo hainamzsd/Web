@@ -47,7 +47,7 @@ export default function HistoryPage() {
       let query = supabase
         .from('survey_locations')
         .select('*')
-        .in('status', ['approved_commune', 'rejected', 'approved_central', 'published'])
+        .in('status', ['approved_commune', 'approved_province', 'approved_central', 'rejected'])
         .order('updated_at', { ascending: false })
 
       // Filter by ward_id first, then province_id, then province_code
@@ -90,7 +90,7 @@ export default function HistoryPage() {
       result = result.filter(s =>
         (s.location_name?.toLowerCase().includes(term)) ||
         (s.address?.toLowerCase().includes(term)) ||
-        (s.owner_name?.toLowerCase().includes(term)) ||
+        (s.representative_name?.toLowerCase().includes(term)) ||
         (s.location_identifier?.toLowerCase().includes(term))
       )
     }
@@ -114,20 +114,21 @@ export default function HistoryPage() {
             Đã duyệt (Xã)
           </span>
         )
-      case 'approved_central':
+      case 'approved_province':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            <CheckCircle2 className="h-3 w-3" />
+            Đã duyệt (Tỉnh)
+          </span>
+        )
+      case 'approved_central':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
             <Award className="h-3 w-3" />
             Đã duyệt (TW)
           </span>
         )
-      case 'published':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-            <Globe className="h-3 w-3" />
-            Đã công bố
-          </span>
-        )
+
       case 'rejected':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -150,8 +151,9 @@ export default function HistoryPage() {
 
   // Stats
   const statsApproved = surveys.filter(s => s.status === 'approved_commune').length
+  const statsApprovedProvince = surveys.filter(s => s.status === 'approved_province').length
   const statsApprovedCentral = surveys.filter(s => s.status === 'approved_central').length
-  const statsPublished = surveys.filter(s => s.status === 'published').length
+
   const statsRejected = surveys.filter(s => s.status === 'rejected').length
 
   return (
@@ -183,28 +185,29 @@ export default function HistoryPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-blue-300 transition-colors" onClick={() => setStatusFilter('approved_central')}>
+        <Card className="cursor-pointer hover:border-blue-300 transition-colors" onClick={() => setStatusFilter('approved_province')}>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500">Đã duyệt (Tỉnh)</p>
+                <p className="text-2xl font-bold text-blue-600">{statsApprovedProvince}</p>
+              </div>
+              <CheckCircle2 className="h-8 w-8 text-blue-200" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:border-indigo-300 transition-colors" onClick={() => setStatusFilter('approved_central')}>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-500">Đã duyệt (TW)</p>
-                <p className="text-2xl font-bold text-blue-600">{statsApprovedCentral}</p>
+                <p className="text-2xl font-bold text-indigo-600">{statsApprovedCentral}</p>
               </div>
-              <Award className="h-8 w-8 text-blue-200" />
+              <Award className="h-8 w-8 text-indigo-200" />
             </div>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-purple-300 transition-colors" onClick={() => setStatusFilter('published')}>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">Đã công bố</p>
-                <p className="text-2xl font-bold text-purple-600">{statsPublished}</p>
-              </div>
-              <Globe className="h-8 w-8 text-purple-200" />
-            </div>
-          </CardContent>
-        </Card>
+
         <Card className="cursor-pointer hover:border-red-300 transition-colors" onClick={() => setStatusFilter('rejected')}>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
@@ -240,8 +243,9 @@ export default function HistoryPage() {
               >
                 <option value="all">Tất cả trạng thái</option>
                 <option value="approved_commune">Đã duyệt (Xã)</option>
+                <option value="approved_province">Đã duyệt (Tỉnh)</option>
                 <option value="approved_central">Đã duyệt (TW)</option>
-                <option value="published">Đã công bố</option>
+
                 <option value="rejected">Từ chối</option>
               </select>
             </div>
@@ -314,7 +318,7 @@ export default function HistoryPage() {
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-gray-400" />
                           <span className="text-sm text-gray-600">
-                            {survey.owner_name || '-'}
+                            {survey.representative_name || '-'}
                           </span>
                         </div>
                       </td>

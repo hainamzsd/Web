@@ -158,7 +158,7 @@ export function RecordProcessor({
         </div>
 
         {/* Owner Information */}
-        {record.owner_name && (
+        {record.representative_name && (
           <div className="border-t pt-4">
             <div className="flex items-center gap-2 mb-2">
               <User className="h-4 w-4 text-gray-600" />
@@ -167,12 +167,12 @@ export function RecordProcessor({
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-gray-600">Tên</p>
-                <p className="text-gray-900">{record.owner_name}</p>
+                <p className="text-gray-900">{record.representative_name}</p>
               </div>
-              {record.owner_phone && (
+              {record.representative_phone && (
                 <div>
                   <p className="text-gray-600">Số điện thoại</p>
-                  <p className="text-gray-900">{record.owner_phone}</p>
+                  <p className="text-gray-900">{record.representative_phone}</p>
                 </div>
               )}
             </div>

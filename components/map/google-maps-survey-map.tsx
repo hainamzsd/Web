@@ -107,7 +107,7 @@ export function GoogleMapsSurveyMap({
       if (survey.location_identifier?.toLowerCase().includes(query)) return true
       if (survey.location_name?.toLowerCase().includes(query)) return true
       if (survey.address?.toLowerCase().includes(query)) return true
-      if (survey.owner_name?.toLowerCase().includes(query)) return true
+      if (survey.representative_name?.toLowerCase().includes(query)) return true
       return false
     })
 
@@ -497,12 +497,12 @@ export function GoogleMapsSurveyMap({
             )}
 
             <div className="grid grid-cols-1 gap-2">
-              {selectedSurvey.owner_name && (
+              {selectedSurvey.representative_name && (
                 <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                   <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-gray-500">Chủ sở hữu</p>
-                    <p className="text-sm font-medium truncate">{selectedSurvey.owner_name}</p>
+                    <p className="text-sm font-medium truncate">{selectedSurvey.representative_name}</p>
                   </div>
                 </div>
               )}

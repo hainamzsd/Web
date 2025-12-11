@@ -31,7 +31,7 @@ export function SurveysClient({ initialSurveys, entryPointCounts = {} }: Surveys
       filtered = filtered.filter(s =>
         (s.location_name?.toLowerCase().includes(term)) ||
         (s.address?.toLowerCase().includes(term)) ||
-        (s.owner_name?.toLowerCase().includes(term))
+        (s.representative_name?.toLowerCase().includes(term))
       )
     }
 

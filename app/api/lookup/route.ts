@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
         objectType: surveyData.object_type,
         province: provinceName,
         ward: wardName,
-        status: surveyData.status === 'published' ? 'Đã công bố' : 'Đang xử lý'
+        status: surveyData.status === 'approved_central' ? 'Đã công bố' : 'Đang xử lý'
       }
     })
 

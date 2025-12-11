@@ -16,7 +16,7 @@ interface SurveyData {
   status: string
   polygon_geometry?: Json | null
   address?: string
-  owner_name?: string
+  representative_name?: string
   land_area_m2?: number | null
 }
 
@@ -414,10 +414,10 @@ export function VietnamAdminMap({
                   )}
 
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    {survey.owner_name && (
+                    {survey.representative_name && (
                       <div>
                         <span className="text-gray-500">Chủ sở hữu:</span>
-                        <p className="font-medium text-gray-800">{survey.owner_name}</p>
+                        <p className="font-medium text-gray-800">{survey.representative_name}</p>
                       </div>
                     )}
                     {survey.land_area_m2 && (
@@ -537,10 +537,10 @@ export function VietnamAdminMap({
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-3">
-              {selectedSurvey.owner_name && (
+              {selectedSurvey.representative_name && (
                 <div className="bg-gray-50 rounded-lg p-2.5">
                   <span className="text-xs text-gray-500 block">Chủ sở hữu</span>
-                  <span className="font-medium text-gray-800">{selectedSurvey.owner_name}</span>
+                  <span className="font-medium text-gray-800">{selectedSurvey.representative_name}</span>
                 </div>
               )}
               {selectedSurvey.land_area_m2 && (

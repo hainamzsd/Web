@@ -253,7 +253,7 @@ export default function BoundaryMap({
       if (survey.location_identifier?.toLowerCase().includes(query)) return true
       if (survey.location_name?.toLowerCase().includes(query)) return true
       if (survey.address?.toLowerCase().includes(query)) return true
-      if (survey.owner_name?.toLowerCase().includes(query)) return true
+      if (survey.representative_name?.toLowerCase().includes(query)) return true
       return false
     })
 
@@ -276,13 +276,41 @@ export default function BoundaryMap({
     }
   }, [onSurveySelect])
 
-  // Load Vietnam GeoJSON for central admin default view
+  // Province folders for loading GeoJSON
+  const PROVINCE_FOLDERS = [
+    'angiang', 'bacninh', 'camau', 'cantho', 'caobang', 'daklak', 'danang',
+    'dienbien', 'dongnai', 'gialai', 'haiphong', 'hanoi', 'hatinh', 'hochiminh',
+    'hue', 'hungyen', 'khanhhoa', 'laichau', 'lamdong', 'langson', 'laocai',
+    'nghean', 'ninhbinh', 'phutho', 'quangngai', 'quangninh', 'quangtri',
+    'sonla', 'tayninh', 'thainguyen', 'thanhhoa', 'tuyenquang', 'vinhlong'
+  ]
+
+  // Load Vietnam GeoJSON from individual province files
   useEffect(() => {
     const loadVietnamGeoJson = async () => {
       try {
-        const response = await fetch('/vn.json')
-        const data = await response.json()
-        setVietnamGeoJson(data)
+        const allFeatures: any[] = []
+
+        for (const folder of PROVINCE_FOLDERS) {
+          try {
+            const response = await fetch(`/geojson/${folder}/province.geojson`)
+            if (response.ok) {
+              const data = await response.json()
+              if (data.features) {
+                allFeatures.push(...data.features)
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to load province: ${folder}`)
+          }
+        }
+
+        if (allFeatures.length > 0) {
+          setVietnamGeoJson({
+            type: 'FeatureCollection',
+            features: allFeatures
+          })
+        }
       } catch (error) {
         console.error('Failed to load Vietnam GeoJSON:', error)
       }
@@ -901,7 +929,7 @@ export default function BoundaryMap({
             <p style="font-size: 12px; color: #666;">
               Diện tích: ${selectedSurvey.land_area_m2 ? selectedSurvey.land_area_m2.toLocaleString('vi-VN') + ' m²' : 'Chưa xác định'}
             </p>
-            ${selectedSurvey.owner_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${selectedSurvey.owner_name}</p>` : ''}
+            ${selectedSurvey.representative_name ? `<p style="font-size: 11px; color: #666;">Chủ sở hữu: ${selectedSurvey.representative_name}</p>` : ''}
           </div>
         `)
 
@@ -1215,7 +1243,7 @@ export default function BoundaryMap({
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
             <div className="flex items-center gap-1.5 text-gray-600">
               <User className="h-3.5 w-3.5" />
-              <span className="truncate">{selectedSurvey.owner_name || '-'}</span>
+              <span className="truncate">{selectedSurvey.representative_name || '-'}</span>
             </div>
             <div className="flex items-center gap-1.5 text-gray-600">
               <Calendar className="h-3.5 w-3.5" />
@@ -1310,6 +1338,58 @@ export default function BoundaryMap({
         )}
       </div>
 
+      {/* Survey Stats Box */}
+      <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-lg p-4 min-w-[200px]" style={{ marginTop: '48px' }}>
+        <h5 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-blue-600" />
+          Thống kê khảo sát
+        </h5>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">Tổng số:</span>
+            <span className="text-lg font-bold text-blue-600">{surveys.length}</span>
+          </div>
+          {selectedProvinceCode && (
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <span className="text-xs text-gray-500">Tỉnh đã chọn:</span>
+              <span className="text-sm font-semibold text-green-600">
+                {surveyCountByProvince[selectedProvinceCode] || 0}
+              </span>
+            </div>
+          )}
+          {selectedWardCode && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">Xã đã chọn:</span>
+              <span className="text-sm font-semibold text-amber-600">
+                {surveyCountByWard[selectedWardCode.toString()] || 0}
+              </span>
+            </div>
+          )}
+          {/* Status breakdown */}
+          <div className="pt-2 border-t border-gray-100 mt-2">
+            <p className="text-xs text-gray-500 mb-1.5">Theo trạng thái:</p>
+            <div className="grid grid-cols-2 gap-1 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <span className="text-gray-600">Duyệt TW: {surveys.filter(s => s.status === 'approved_central').length}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                <span className="text-gray-600">Duyệt Tỉnh: {surveys.filter(s => s.status === 'approved_province' || s.status === 'approved_commune').length}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                <span className="text-gray-600">Chờ duyệt: {surveys.filter(s => s.status === 'pending').length}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                <span className="text-gray-600">Từ chối: {surveys.filter(s => s.status === 'rejected').length}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Vietnam Sovereignty Legend - shown when no province selected */}
       {(role === 'central_admin' || role === 'admin') && !selectedProvinceCode && (
         <div className="absolute bottom-4 left-4 z-[1000] bg-white rounded-lg shadow-lg p-3 max-w-[200px]">
@@ -1319,7 +1399,7 @@ export default function BoundaryMap({
           <div className="space-y-1.5 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-4 h-3 border-2 border-red-600 border-dashed"></div>
-              <span>Biên giới Việt Nam</span>
+              <span>Biên giới tỉnh</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-3 bg-red-50 border border-red-600 border-dashed"></div>

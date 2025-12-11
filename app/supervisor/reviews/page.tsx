@@ -86,7 +86,7 @@ export default function ReviewsPage() {
       result = result.filter(s =>
         (s.location_name?.toLowerCase().includes(term)) ||
         (s.address?.toLowerCase().includes(term)) ||
-        (s.owner_name?.toLowerCase().includes(term))
+        (s.representative_name?.toLowerCase().includes(term))
       )
     }
 
@@ -221,7 +221,7 @@ export default function ReviewsPage() {
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-gray-400" />
                           <span className="text-sm text-gray-600">
-                            {survey.owner_name || '-'}
+                            {survey.representative_name || '-'}
                           </span>
                         </div>
                       </td>

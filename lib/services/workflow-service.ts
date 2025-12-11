@@ -9,7 +9,7 @@ import { Database } from '@/lib/types/database'
 type SurveyLocation = Database['public']['Tables']['survey_locations']['Row']
 type ApprovalHistory = Database['public']['Tables']['approval_history']['Insert']
 
-export type WorkflowAction = 'approve' | 'reject'
+export type WorkflowAction = 'approve' | 'reject' | 'forward'
 
 export interface WorkflowResult {
   success: boolean
@@ -33,7 +33,8 @@ export interface WorkflowResult {
 const WORKFLOW_TRANSITIONS = {
   pending: {
     approve: 'approved_province',  // Province approves
-    reject: 'rejected'
+    reject: 'rejected',
+    forward: 'reviewed'            // Commune forwards to Province (marked as reviewed)
   },
   reviewed: {
     approve: 'approved_province',  // Province approves (backward compatibility)
@@ -101,12 +102,23 @@ export async function executeWorkflowAction(
         break
       case 'reject':
         if (currentStatus === 'pending' || currentStatus === 'reviewed' ||
-            currentStatus === 'approved_province' || currentStatus === 'approved_commune') {
+          currentStatus === 'approved_province' || currentStatus === 'approved_commune') {
           newStatus = 'rejected'
         } else {
           return {
             success: false,
             message: 'Không thể từ chối từ trạng thái hiện tại'
+          }
+        }
+        break
+      case 'forward':
+        if (currentStatus === 'pending') {
+          // Commune officer forwards to province
+          newStatus = 'reviewed'
+        } else {
+          return {
+            success: false,
+            message: 'Chỉ có thể chuyển tiếp hồ sơ đang chờ xử lý'
           }
         }
         break
@@ -279,6 +291,8 @@ function getSuccessMessage(action: WorkflowAction, newStatus: string): string {
       return 'Đã phê duyệt khảo sát'
     case 'reject':
       return 'Đã từ chối khảo sát'
+    case 'forward':
+      return 'Đã chuyển hồ sơ lên cấp trên'
     default:
       return 'Đã thực hiện hành động'
   }
@@ -303,10 +317,13 @@ export function canPerformAction(
 
   switch (userRole) {
     case 'commune_officer':
-      // Commune officers can only view, no approval actions
+      // Commune officers can view and forward pending surveys
+      if (action === 'forward' && status === 'pending') {
+        return { allowed: true }
+      }
       return {
         allowed: false,
-        reason: 'Cán bộ xã chỉ có quyền xem, không có quyền phê duyệt'
+        reason: 'Cán bộ xã chỉ có quyền xem và chuyển tiếp hồ sơ mới'
       }
 
     case 'commune_supervisor':

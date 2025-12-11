@@ -67,7 +67,7 @@ export default function CommuneDashboardPage() {
         const createdAt = new Date(item.created_at)
         if (item.status === 'pending') acc.pending++
         else if (item.status === 'reviewed') acc.reviewed++
-        else if (item.status === 'approved_commune' || item.status === 'approved_central' || item.status === 'published') acc.approved++
+        else if (['approved_commune', 'approved_central', 'approved_province'].includes(item.status)) acc.approved++
         else if (item.status === 'rejected') acc.rejected++
         acc.total++
         if (createdAt >= oneWeekAgo) acc.thisWeek++

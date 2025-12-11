@@ -18,7 +18,7 @@ interface SurveyWithLocation {
   status: string
   polygon_geometry: any
   address: string | null
-  owner_name: string | null
+  representative_name: string | null
   land_area_m2: number | null
   province_id: number | null
   province_name: string | null
@@ -118,7 +118,7 @@ export default function NationalMapPage() {
 
       statsByProvince[provinceId].total++
       if (survey.status === 'pending' || survey.status === 'reviewed') statsByProvince[provinceId].pending++
-      if (survey.status === 'approved_central' || survey.status === 'approved_commune' || survey.status === 'approved_province' || survey.status === 'published') {
+      if (survey.status === 'approved_central' || survey.status === 'approved_commune' || survey.status === 'approved_province') {
         statsByProvince[provinceId].approved++
       }
       if (survey.status === 'rejected') statsByProvince[provinceId].rejected++
@@ -244,7 +244,7 @@ export default function NationalMapPage() {
                       status: s.status,
                       polygon_geometry: s.polygon_geometry,
                       address: s.address || undefined,
-                      owner_name: s.owner_name || undefined,
+                      representative_name: s.representative_name || undefined,
                       land_area_m2: s.land_area_m2 ?? undefined
                     }))}
                 />

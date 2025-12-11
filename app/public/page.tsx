@@ -18,7 +18,7 @@ interface NationalStats {
   total: number
   pending: number
   approved: number
-  published: number
+  approved_province: number
   thisMonth: number
   lastMonth: number
   provinces: { name: string; count: number }[]
@@ -66,8 +66,8 @@ export default function PublicPortalPage() {
         const nationalStats: NationalStats = {
           total: data?.length || 0,
           pending: data?.filter(s => s.status === 'pending').length || 0,
-          approved: data?.filter(s => ['approved_commune', 'approved_central'].includes(s.status)).length || 0,
-          published: data?.filter(s => s.status === 'published').length || 0,
+          approved: data?.filter(s => ['approved_commune', 'approved_central', 'approved_province'].includes(s.status)).length || 0,
+          approved_province: data?.filter(s => s.status === 'approved_province').length || 0,
           thisMonth: data?.filter(s => new Date(s.created_at) >= thisMonthStart).length || 0,
           lastMonth: data?.filter(s => {
             const d = new Date(s.created_at)
@@ -187,8 +187,8 @@ export default function PublicPortalPage() {
             </div>
             <div className="bg-white/10 backdrop-blur rounded-xl p-6">
               <CheckCircle className="h-8 w-8 mb-3 text-green-300" />
-              <div className="text-4xl font-bold">{stats?.published.toLocaleString()}</div>
-              <div className="text-blue-200 text-sm">Đã công bố</div>
+              <div className="text-4xl font-bold">{stats?.approved_province.toLocaleString()}</div>
+              <div className="text-blue-200 text-sm">Đã duyệt (Tỉnh)</div>
             </div>
             <div className="bg-white/10 backdrop-blur rounded-xl p-6">
               <Clock className="h-8 w-8 mb-3 text-yellow-300" />
@@ -221,8 +221,8 @@ export default function PublicPortalPage() {
                 <AreaChart data={stats?.dailyTrend}>
                   <defs>
                     <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />

@@ -19,7 +19,7 @@ interface LocationIdentifier {
   survey_location?: {
     location_name: string
     address: string
-    owner_name: string
+    representative_name: string
   }
 }
 
@@ -50,7 +50,7 @@ export default function LocationsPage() {
 
           const { data: surveyData } = await supabase
             .from('survey_locations')
-            .select('id, location_name, address, owner_name')
+            .select('id, location_name, address, representative_name')
             .in('id', surveyIds)
 
           // Map survey data to locations
@@ -89,7 +89,7 @@ export default function LocationsPage() {
         loc.location_id,
         loc.survey_location?.location_name || '',
         loc.survey_location?.address || '',
-        loc.survey_location?.owner_name || '',
+        loc.survey_location?.representative_name || '',
         new Date(loc.assigned_at).toLocaleDateString('vi-VN'),
         loc.is_active ? 'Hoạt động' : 'Ngưng hoạt động'
       ].join(','))
@@ -187,7 +187,7 @@ export default function LocationsPage() {
                         {location.survey_location?.address || '-'}
                       </td>
                       <td className="py-3 px-4 text-sm">
-                        {location.survey_location?.owner_name || '-'}
+                        {location.survey_location?.representative_name || '-'}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {new Date(location.assigned_at).toLocaleDateString('vi-VN')}

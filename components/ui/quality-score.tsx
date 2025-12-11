@@ -95,7 +95,7 @@ export function calculateQualityScore(survey: {
   accuracy?: number | null
   location_name?: string | null
   address?: string | null
-  owner_name?: string | null
+  representative_name?: string | null
   owner_phone?: string | null
   owner_id_number?: string | null
   polygon_geometry?: unknown
@@ -138,7 +138,7 @@ export function calculateQualityScore(survey: {
   const requiredFields = [
     survey.location_name,
     survey.address,
-    survey.owner_name,
+    survey.representative_name,
     survey.object_type,
     survey.land_use_type
   ]

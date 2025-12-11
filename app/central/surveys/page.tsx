@@ -78,7 +78,7 @@ export default function CentralSurveysPage() {
       filtered = filtered.filter(s =>
         s.location_name?.toLowerCase().includes(term) ||
         s.address?.toLowerCase().includes(term) ||
-        s.owner_name?.toLowerCase().includes(term) ||
+        s.representative_name?.toLowerCase().includes(term) ||
         s.location_identifier?.toLowerCase().includes(term) ||
         s.id.toLowerCase().includes(term)
       )
@@ -244,7 +244,7 @@ export default function CentralSurveysPage() {
                           )}
                         </td>
                         <td className="py-3 px-4 text-sm">
-                          {survey.owner_name || '-'}
+                          {survey.representative_name || '-'}
                         </td>
                         <td className="py-3 px-4">
                           <QualityScore score={qualityScore.total} size="sm" />

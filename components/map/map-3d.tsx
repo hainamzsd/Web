@@ -236,7 +236,7 @@ export function Map3D({
       if (survey.location_identifier?.toLowerCase().includes(query)) return true
       if (survey.location_name?.toLowerCase().includes(query)) return true
       if (survey.address?.toLowerCase().includes(query)) return true
-      if (survey.owner_name?.toLowerCase().includes(query)) return true
+      if (survey.representative_name?.toLowerCase().includes(query)) return true
       return false
     })
 
@@ -287,15 +287,7 @@ export function Map3D({
 
       // Add sky layer
       if (!map.current?.getLayer('sky')) {
-        map.current?.addLayer({
-          id: 'sky',
-          type: 'sky',
-          paint: {
-            'sky-type': 'atmosphere',
-            'sky-atmosphere-sun': [0.0, 90.0],
-            'sky-atmosphere-sun-intensity': 15
-          }
-        })
+
       }
     })
   }
@@ -326,15 +318,7 @@ export function Map3D({
       }
 
       // Add sky layer for better 3D effect
-      mapInstance.addLayer({
-        id: 'sky',
-        type: 'sky',
-        paint: {
-          'sky-type': 'atmosphere',
-          'sky-atmosphere-sun': [0.0, 90.0],
-          'sky-atmosphere-sun-intensity': 15
-        }
-      })
+
 
       setIsMapReady(true)
     })
@@ -390,7 +374,7 @@ export function Map3D({
         glowColor = isActive ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'
       } else {
         switch (survey.status) {
-          case 'published':
+          case 'approved_province':
             markerColor = '#10b981'
             glowColor = 'rgba(16, 185, 129, 0.4)'
             break
@@ -536,8 +520,8 @@ export function Map3D({
       pending: 'Chờ xử lý',
       reviewed: 'Đã xem xét',
       approved_commune: 'Đã duyệt (Xã)',
+      approved_province: 'Đã duyệt (Tỉnh)',
       approved_central: 'Đã duyệt (TW)',
-      published: 'Đã công bố',
       rejected: 'Từ chối'
     }
     return labels[status] || status
@@ -548,8 +532,8 @@ export function Map3D({
       pending: 'bg-amber-100 text-amber-700',
       reviewed: 'bg-sky-100 text-sky-700',
       approved_commune: 'bg-purple-100 text-purple-700',
+      approved_province: 'bg-green-100 text-green-700',
       approved_central: 'bg-blue-100 text-blue-700',
-      published: 'bg-green-100 text-green-700',
       rejected: 'bg-red-100 text-red-700'
     }
     return colors[status] || 'bg-gray-100 text-gray-700'
@@ -609,12 +593,11 @@ export function Map3D({
                         onClick={() => goToSurvey(survey)}
                         className="w-full px-4 py-3 hover:bg-blue-50 flex items-start gap-3 border-b border-gray-100 last:border-0 transition-colors text-left"
                       >
-                        <div className={`mt-0.5 w-3 h-3 rounded-full flex-shrink-0 ${
-                          survey.status === 'published' ? 'bg-green-500' :
-                          survey.status === 'approved_central' ? 'bg-blue-500' :
-                          survey.status === 'approved_commune' ? 'bg-purple-500' :
-                          survey.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500'
-                        }`} />
+                        <div className={`mt-0.5 w-3 h-3 rounded-full flex-shrink-0 ${survey.status === 'approved_central' ? 'bg-blue-500' :
+                          survey.status === 'approved_province' ? 'bg-green-500' :
+                            survey.status === 'approved_commune' ? 'bg-purple-500' :
+                              survey.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500'
+                          }`} />
                         <div className="flex-1 min-w-0">
                           <span className="font-medium text-sm text-gray-900 truncate block">
                             {survey.location_name || 'Chưa đặt tên'}
@@ -668,11 +651,10 @@ export function Map3D({
                 <button
                   key={styleKey}
                   onClick={() => changeStyle(styleKey)}
-                  className={`w-full px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
-                    currentStyle === styleKey
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className={`w-full px-3 py-2 text-sm flex items-center gap-2 transition-colors ${currentStyle === styleKey
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-50'
+                    }`}
                 >
                   {MAP_STYLES[styleKey].icon}
                   {MAP_STYLES[styleKey].name}
@@ -763,14 +745,12 @@ export function Map3D({
             </div>
 
             {locationIdentifiers[selectedSurvey.id] && (
-              <div className={`flex items-center gap-2 p-2 rounded-lg ${
-                locationIdentifiers[selectedSurvey.id].is_active
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-red-700'
-              }`}>
-                <div className={`w-3 h-3 rounded-full ${
-                  locationIdentifiers[selectedSurvey.id].is_active ? 'bg-green-500' : 'bg-red-500'
-                }`}></div>
+              <div className={`flex items-center gap-2 p-2 rounded-lg ${locationIdentifiers[selectedSurvey.id].is_active
+                ? 'bg-green-50 text-green-700'
+                : 'bg-red-50 text-red-700'
+                }`}>
+                <div className={`w-3 h-3 rounded-full ${locationIdentifiers[selectedSurvey.id].is_active ? 'bg-green-500' : 'bg-red-500'
+                  }`}></div>
                 <div>
                   <span className="text-xs font-medium">
                     Mã: {locationIdentifiers[selectedSurvey.id].location_id}
@@ -783,12 +763,12 @@ export function Map3D({
             )}
 
             <div className="grid grid-cols-1 gap-2">
-              {selectedSurvey.owner_name && (
+              {selectedSurvey.representative_name && (
                 <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                   <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-gray-500">Chủ sở hữu</p>
-                    <p className="text-sm font-medium truncate">{selectedSurvey.owner_name}</p>
+                    <p className="text-sm font-medium truncate">{selectedSurvey.representative_name}</p>
                   </div>
                 </div>
               )}
